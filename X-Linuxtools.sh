@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# XLinuxtools — sysinfo, update, cleanup, server_deploy (no log retention)
+# XLinuxtools — sysinfo, update, cleanup, server_deploy, debian_desktop_setup (no log retention)
 # Clean banner menu
 
 set -Eeuo pipefail
 
 APP_NAME="XLinuxtools"
 APP_CMD="${0##*/}"
-VERSION="0.4.3"
+VERSION="0.5.1"
 
 LOG_DIR="${XLT_LOG_DIR:-$HOME/.local/share/xlinuxtools/logs}"
 CONF_DIR="${XLT_CONF_DIR:-$HOME/.config/xlinuxtools}"
@@ -14,8 +14,11 @@ DRY_RUN="${XLT_DRY_RUN:-false}"
 NO_COLOR="${NO_COLOR:-}"
 
 SERVERDEPLOY_URL="https://raw.githubusercontent.com/GamerX27/Homelab-X27/refs/heads/main/Serverdeploy.sh"
+DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
+DEBIAN_POST_LOCAL_NAME="Debian-Post-Installer.sh"
+DEBIAN_POST_LOCAL_FALLBACK="/Scripts/Debian-Post-Installer.sh"
 
-# Colors (respects NO_COLOR)
+# Colors
 if [[ -z "${NO_COLOR}" ]]; then
   BOLD=$'\e[1m'; DIM=$'\e[2m'; RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'
   CYA=$'\e[36m'; RST=$'\e[0m'
@@ -174,29 +177,72 @@ xlt_server_deploy() {
   ok "ServerDeploy finished."
 }
 
+xlt_debian_desktop_setup() {
+  echo
+  inf "Debian Desktop Setup (CLI → KDE)"
+  msg " - Installs KDE Standard desktop"
+  msg " - Installs Flatpak + Discover Flatpak backend"
+  msg " - Installs fish, fastfetch, VLC"
+  msg " - Adds Flathub, cleans APT"
+  msg " - Removes /etc/network/interfaces and reboots"
+  echo
+  warn "Debian-focused. This will make desktop changes and trigger a reboot."
+  if ! confirm "Run the Debian Desktop Setup now? (KDE, Flatpak, fish/fastfetch/VLC, Flathub, cleanup, reboot)"; then
+    warn "Canceled."
+    return 0
+  fi
+
+  local runner=""
+  if [[ -f "$DEBIAN_POST_LOCAL_FALLBACK" ]]; then
+    inf "Found local script at $DEBIAN_POST_LOCAL_FALLBACK"
+    runner="$DEBIAN_POST_LOCAL_FALLBACK"
+  else
+    if ! command -v wget >/dev/null 2>&1; then
+      warn "wget not found. Installing wget (Debian/apt only)."
+      if [[ "$(detect_pkg)" == "apt" ]]; then
+        run sudo_maybe apt-get update
+        run sudo_maybe apt-get -y install wget
+      else
+        err "wget is required and could not be auto-installed."
+        return 1
+      fi
+    fi
+    inf "Downloading script to current directory: ./$DEBIAN_POST_LOCAL_NAME"
+    run bash -c "wget -qO '$DEBIAN_POST_LOCAL_NAME' '$DEBIAN_POST_URL'"
+    run chmod +x "$DEBIAN_POST_LOCAL_NAME"
+    runner="./$DEBIAN_POST_LOCAL_NAME"
+  fi
+
+  inf "Executing: $runner"
+  run sudo_maybe bash "$runner"
+  ok "Debian Desktop Setup complete (system may reboot)."
+}
+
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "server_deploy" )
+declare -a ACTIONS=( "sysinfo" "update" "cleanup" "server_deploy" "debian_desktop_setup" )
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
   "Clean caches/logs safely (asks for confirmation)."
   "X27 ServerDeploy: install Docker (official repo), optional Portainer, and an updater for OS & containers."
+  "Debian Desktop Setup (CLI→KDE): Install KDE, Flatpak, fish/fastfetch/VLC, Flathub, cleanup, reboot."
 )
 
 list_actions() {
   local i
   for (( i=0; i<${#ACTIONS[@]}; i++ )); do
-    printf "  %-14s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
+    printf "  %-20s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
   done
 }
 
 run_action() {
   local name="$1"; shift || true
   case "$name" in
-    sysinfo)       xlt_sysinfo "$@";;
-    update)        xlt_update "$@";;
-    cleanup)       xlt_cleanup "$@";;
-    server_deploy) xlt_server_deploy "$@";;
+    sysinfo)              xlt_sysinfo "$@";;
+    update)               xlt_update "$@";;
+    cleanup)              xlt_cleanup "$@";;
+    server_deploy)        xlt_server_deploy "$@";;
+    debian_desktop_setup) xlt_debian_desktop_setup "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
@@ -210,7 +256,7 @@ menu() {
   echo
   local i
   for (( i=0; i<${#ACTIONS[@]}; i++ )); do
-    printf "%2d) %-14s %s\n" "$((i+1))" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
+    printf "%2d) %-20s %s\n" "$((i+1))" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
   done
   echo " q) quit"
   echo
