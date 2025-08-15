@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.1"
+VERSION="0.6.3"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -172,10 +172,10 @@ ensure_ytdlp() {
 }
 
 ensure_yt_deps() {
-  ensure_wget   || return 1
+  ensure_wget    || return 1
   ensure_python3 || return 1
-  ensure_ffmpeg || return 1
-  ensure_ytdlp  || return 1
+  ensure_ffmpeg  || return 1
+  ensure_ytdlp   || return 1
   ok "All YT Downloader dependencies are present."
 }
 
@@ -287,34 +287,63 @@ x27_debian_desktop_setup() {
 
 x27_yt_downloader() {
   echo
-  inf "YT Downloader (temp script)"
+  inf "YT Downloader (local script)"
   msg " - Downloads videos/playlists as MP4 or MP3 using yt-dlp"
   msg " - Uses ffmpeg for merging/encoding"
-  msg " - Script saved temporarily in current folder; downloads go to ./YT-Downloads"
+  msg " - Script saved locally; downloads go to ./YT-Downloads"
   echo
 
-  if ! confirm "Install/check deps (python3, ffmpeg, yt-dlp, wget) and run the YT Downloader now?"; then
-    warn "Canceled."; return 0
+  local fname="YT-Downloader-Cli.py"
+
+  # If yt-dlp is present, SKIP any install prompts and just run the app.
+  if have yt-dlp; then
+    ok "yt-dlp detected — skipping dependency installation."
+    if ! have python3; then
+      err "python3 is not installed. Please install python3 and rerun."
+      return 1
+    fi
+    if [[ ! -f "$fname" ]]; then
+      if have wget; then
+        inf "Fetching downloader to ./$fname"
+        run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"
+      else
+        err "wget not found to fetch the script automatically. Install wget or place $fname here."
+        return 1
+      fi
+    else
+      inf "Using existing $fname"
+    fi
+    inf "Launching downloader (python3 $fname)…"
+    run python3 "$fname" || true
+    ok "YT Downloader finished. Files are in ./YT-Downloads"
+    return 0
+  fi
+
+  # yt-dlp missing -> show what else is missing and ask to install
+  warn "yt-dlp not found."
+  local missing=()
+  have python3 || missing+=("python3")
+  have ffmpeg  || missing+=("ffmpeg")
+  missing+=("yt-dlp")
+  have wget    || missing+=("wget")
+  warn "Missing dependencies: ${missing[*]}"
+  if ! confirm "Install missing dependencies now?"; then
+    warn "Canceled because dependencies are missing."
+    return 1
   fi
 
   ensure_yt_deps || return 1
 
-  local ts fname
-  ts="$(date +%s)"
-  fname="YT-Downloader-Cli.$ts.py"
-  ensure_wget || return 1
-  inf "Fetching downloader to ./$fname"
-  run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"
-
-  cleanup_temp_py() { [[ -f "$fname" ]] && rm -f -- "$fname"; }
-  trap cleanup_temp_py INT TERM RETURN
+  # Ensure the script file exists
+  if [[ ! -f "$fname" ]]; then
+    inf "Fetching downloader to ./$fname"
+    run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"
+  else
+    inf "Using existing $fname"
+  fi
 
   inf "Launching downloader (python3 $fname)…"
   run python3 "$fname" || true
-
-  cleanup_temp_py
-  trap - INT TERM RETURN
-
   ok "YT Downloader finished. Files are in ./YT-Downloads"
 }
 
@@ -326,7 +355,7 @@ declare -a DESCRIPTIONS=(
   "Clean caches/logs safely (asks for confirmation)."
   "X27 ServerDeploy: install Docker (official repo), optional Portainer, and updater."
   "Debian Desktop Setup (CLI→KDE)."
-  "YT Downloader: Fetch temp script, ensure deps, download videos/playlists."
+  "YT Downloader: Local script; skips install if yt-dlp is present."
 )
 
 list_actions() {
