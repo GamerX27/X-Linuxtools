@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.5"
+VERSION="0.6.6"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -23,9 +23,13 @@ VIRT_LOCAL_FALLBACK="/Scripts/Virtualization_Setup.sh"
 VIRT_LOCAL_NAME="Virtualization_Setup.sh"
 VIRT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Virtualization_Setup.sh"
 
-# NEW: Server Updater (universal updater + scheduler)
+# Server Updater (universal updater + scheduler)
 SERVER_UPDATER_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Server-Updater.sh"
 SERVER_UPDATER_LOCAL_NAME="Server-Updater.sh"
+
+# Docker Install (OS-detects, installs Docker+plugins, adds user to docker group, optional Portainer)
+DOCKER_INSTALL_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Docker-Install.sh"
+DOCKER_INSTALL_LOCAL_NAME="Docker-Install.sh"
 
 # Colors (respects NO_COLOR)
 if [[ -z "${NO_COLOR}" ]]; then
@@ -160,7 +164,7 @@ ensure_ytdlp() {
     dnf)    run sudo_maybe dnf -y install yt-dlp && ok="true" ;;
     yum)    run sudo_maybe yum -y install yt-dlp && ok="true" || true ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm yt-dlp && ok="true" ;;
-    zypper) run sudo_maybe zypper --non-interactive in yt-dlp && ok="true" || true ;;
+    zypper) run sudo_maybe zyper --non-interactive in yt-dlp && ok="true" || true ;;
     *)      ok="false" ;;
   esac
   if [[ "$ok" != "true" ]]; then
@@ -214,7 +218,7 @@ x27_update() {
     dnf)    run sudo_maybe dnf -y upgrade ;;
     yum)    run sudo_maybe yum -y update ;;
     pacman) run sudo_maybe pacman -Syu --noconfirm ;;
-    zypper) run sudo_maybe zypper refresh; run sudo_maybe zyper update -y ;;
+    zypper) run sudo_maybe zypper refresh; run sudo_maybe zypper update -y ;;
     *)      err "Unsupported package manager: $mgr"; return 1 ;;
   esac
   ok "System update complete."
@@ -360,7 +364,7 @@ x27_virtualization_setup() {
   ok "Virtualization Setup complete. You can now run virt-manager."
 }
 
-# NEW ACTION: Deploy Server Updater
+# Deploy Server Updater
 x27_server_updater() {
   echo
   inf "Deploy Server Updater"
@@ -383,8 +387,32 @@ x27_server_updater() {
   ok "Server Updater deployed."
 }
 
+# NEW: Docker install
+x27_docker_install() {
+  echo
+  inf "Docker Install"
+  msg " - Detects Debian or RHEL family"
+  msg " - Installs Docker Engine + plugins"
+  msg " - Adds current user to docker group"
+  msg " - Optional Portainer setup"
+  echo
+  if ! confirm "Proceed with Docker Install?"; then
+    warn "Canceled."; return 0
+  fi
+
+  ensure_wget || return 1
+
+  inf "Downloading Docker install script to ./$DOCKER_INSTALL_LOCAL_NAME"
+  run bash -c "wget -qO '$DOCKER_INSTALL_LOCAL_NAME' '$DOCKER_INSTALL_URL'"
+  run chmod +x "$DOCKER_INSTALL_LOCAL_NAME"
+
+  inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"
+  run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"
+  ok "Docker installation routine completed (you may need to log out/in for group changes)."
+}
+
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" )
+declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" )
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
@@ -393,6 +421,7 @@ declare -a DESCRIPTIONS=(
   "YT Downloader: Local script; skips install if yt-dlp is present."
   "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
   "Deploy Server Updater: Universal updater + cron job (optional auto-reboot)."
+  "Docker install: Engine+plugins, docker group, optional Portainer."
 )
 
 list_actions() {
@@ -412,6 +441,7 @@ run_action() {
     yt_downloader)        x27_yt_downloader "$@";;
     virtualization_setup) x27_virtualization_setup "$@";;
     server_updater)       x27_server_updater "$@";;
+    docker_install)       x27_docker_install "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
