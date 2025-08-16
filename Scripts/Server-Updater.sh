@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # setup-auto-updates.sh
 # Installs a cross-distro updater and schedules it via cron.
+# - Creates /usr/local/sbin/os_update.sh
+# - Adds /usr/local/bin/update-system (wrapper)
+# - Prompts for day-of-week and time (HH:MM or morning/afternoon/evening/night)
+# - Sets /etc/cron.d/os_auto_update
+# - Logs to /var/log/os_update.log
+# - Supports --dry-run and optional auto-reboot
 
 set -euo pipefail
 
@@ -45,34 +51,32 @@ fi
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-update_debian_like() {
-  echo "[INFO] Detected Debian-like system. Using apt-get..."
+update_debian() {
+  echo "[INFO] Updating Debian/Ubuntu system..."
   if (( DRY_RUN )); then
     echo "[DRY] apt-get update -y"
-    echo "[DRY] apt-get -y dist-upgrade"
+    echo "[DRY] apt-get -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" dist-upgrade"
     echo "[DRY] apt-get -y autoremove --purge"
     echo "[DRY] apt-get -y autoclean"
     return 0
   fi
   export DEBIAN_FRONTEND=noninteractive
-  # Be cautious with config prompts; prefer keeping existing config
   apt-get update -y
   apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
   apt-get -y autoremove --purge
   apt-get -y autoclean
-  # Optional reboot hint: Debian/Ubuntu create this file when needed
   if [[ "${AUTO_REBOOT:-0}" == "1" ]] && [[ -f /var/run/reboot-required ]]; then
-    echo "[INFO] Reboot required. Rebooting now..."
+    echo "[INFO] Reboot required. Rebooting in 1 minute..."
     /sbin/shutdown -r +1 "Auto-reboot after updates"
   fi
-  echo "[INFO] Debian-like update complete."
+  echo "[INFO] Debian/Ubuntu update complete."
 }
 
-update_rhel_like() {
+update_rhel() {
   local mgr=""
   if is_cmd dnf; then
     mgr="dnf"
-    echo "[INFO] Detected RHEL-like system. Using dnf..."
+    echo "[INFO] Updating RHEL/Fedora/CentOS system with dnf..."
     if (( DRY_RUN )); then
       echo "[DRY] dnf -y upgrade --refresh || dnf -y distro-sync --refresh"
       echo "[DRY] dnf -y autoremove"
@@ -82,16 +86,16 @@ update_rhel_like() {
     dnf -y upgrade --refresh || dnf -y distro-sync --refresh
     dnf -y autoremove || true
     dnf -y clean all || true
-    # Auto-reboot if needed (needs-restarting is in dnf-utils or rpm-ostree variants may differ)
     if [[ "${AUTO_REBOOT:-0}" == "1" ]] && is_cmd needs-restarting; then
       if ! needs-restarting -r >/dev/null 2>&1; then
-        echo "[INFO] Reboot required. Rebooting now..."
+        echo "[INFO] Reboot required. Rebooting in 1 minute..."
         /sbin/shutdown -r +1 "Auto-reboot after updates"
       fi
     fi
+    echo "[INFO] RHEL/Fedora/CentOS update complete (dnf)."
   elif is_cmd yum; then
     mgr="yum"
-    echo "[INFO] Detected RHEL-like system. Using yum..."
+    echo "[INFO] Updating RHEL/Fedora/CentOS system with yum..."
     if (( DRY_RUN )); then
       echo "[DRY] yum -y update"
       echo "[DRY] yum -y autoremove"
@@ -103,22 +107,22 @@ update_rhel_like() {
     yum -y clean all || true
     if [[ "${AUTO_REBOOT:-0}" == "1" ]] && is_cmd needs-restarting; then
       if ! needs-restarting -r >/dev/null 2>&1; then
-        echo "[INFO] Reboot required. Rebooting now..."
+        echo "[INFO] Reboot required. Rebooting in 1 minute..."
         /sbin/shutdown -r +1 "Auto-reboot after updates"
       fi
     fi
+    echo "[INFO] RHEL/Fedora/CentOS update complete (yum)."
   else
     echo "[ERROR] Neither dnf nor yum found." >&2
     exit 2
   fi
-  echo "[INFO] RHEL-like update complete via ${mgr}."
 }
 
 # Detect family
 family=""
 if [[ "${ID_LIKE:-}" =~ debian ]] || [[ "${ID:-}" =~ (debian|ubuntu|linuxmint|pop) ]]; then
   family="debian"
-elif [[ "${ID_LIKE:-}" =~ (rhel|fedora) ]] || [[ "${ID:-}" =~ (rhel|centos|rocky|almalinux|ol|fedora) ]]; then
+elif [[ "${ID_LIKE:-}" =~ (rhel|fedora) ]] || [[ "${ID:-}" =~ (rhel|centos|rocky|almalinux|ol|fedora|ol|oracle) ]]; then
   family="rhel"
 else
   if is_cmd apt-get; then family="debian"
@@ -127,14 +131,14 @@ else
 fi
 
 if [[ -z "$family" ]]; then
-  echo "[ERROR] Could not determine distro family. Aborting." >&2
+  echo "[ERROR] Could not determine distro. Aborting." >&2
   exit 3
 fi
 
 if [[ "$family" == "debian" ]]; then
-  update_debian_like
+  update_debian
 else
-  update_rhel_like
+  update_rhel
 fi
 
 echo "[INFO] Kernel: $(uname -r)"
@@ -167,7 +171,7 @@ read_schedule() {
   echo "Enter the day of the week (mon,tue,wed,thu,fri,sat,sun or 0-6; 0/7=Sun):"
   read -r DOW_IN
 
-  # Normalize day of week to cron numeric (0-6, where 0/7=Sun)
+  # Normalize day of week to cron numeric (0-6, 0/7=Sun)
   local DNUM
   case "${DOW_IN,,}" in
     0|7|sun|sunday) DNUM=0 ;;
@@ -231,7 +235,7 @@ AUTO_REBOOT=$AUTO_REBOOT
 $CRON_MIN $CRON_HR * * $CRON_DOW root /usr/local/sbin/os_update.sh
 EOF
 
-  # Ensure trailing newline for cron
+  # Ensure trailing newline for cron parsing
   sed -n '$p' "$cronfile" >/dev/null
 
   chown root:root "$cronfile"
