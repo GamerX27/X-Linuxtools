@@ -2,6 +2,7 @@
 # QEMU/KVM + virt-manager installer for apt/dnf/pacman
 # NAT networking only (no bridged setup)
 # Adds current user to libvirt & kvm groups
+# Debian fix: disable system dnsmasq to avoid libvirt conflicts
 
 set -euo pipefail
 
@@ -58,6 +59,14 @@ install_packages() {
 
 configure_default_network() {
   echo "Configuring default libvirt NAT network..."
+
+  # Debian/Ubuntu-specific fix: disable system dnsmasq to avoid conflicts
+  if [[ "$PKG_MGR" == "apt" ]]; then
+    echo "Applying Debian/Ubuntu dnsmasq fix..."
+    systemctl stop dnsmasq || true
+    systemctl disable dnsmasq || true
+  fi
+
   systemctl restart libvirtd || true
   if ! virsh net-info default &>/dev/null; then
     if [[ -f /usr/share/libvirt/networks/default.xml ]]; then
@@ -78,6 +87,7 @@ EOF
 ) || true
     fi
   fi
+
   virsh net-start default 2>/dev/null || true
   virsh net-autostart default 2>/dev/null || true
   echo "NAT network 'default' active on virbr0."
