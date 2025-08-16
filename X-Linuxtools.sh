@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.4"
+VERSION="0.6.5"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -22,6 +22,10 @@ YTDL_PY_URL="https://raw.githubusercontent.com/GamerX27/YT-Downloader-Script/ref
 VIRT_LOCAL_FALLBACK="/Scripts/Virtualization_Setup.sh"
 VIRT_LOCAL_NAME="Virtualization_Setup.sh"
 VIRT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Virtualization_Setup.sh"
+
+# NEW: Server Updater (universal updater + scheduler)
+SERVER_UPDATER_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Server-Updater.sh"
+SERVER_UPDATER_LOCAL_NAME="Server-Updater.sh"
 
 # Colors (respects NO_COLOR)
 if [[ -z "${NO_COLOR}" ]]; then
@@ -210,7 +214,7 @@ x27_update() {
     dnf)    run sudo_maybe dnf -y upgrade ;;
     yum)    run sudo_maybe yum -y update ;;
     pacman) run sudo_maybe pacman -Syu --noconfirm ;;
-    zypper) run sudo_maybe zypper refresh; run sudo_maybe zypper update -y ;;
+    zypper) run sudo_maybe zypper refresh; run sudo_maybe zyper update -y ;;
     *)      err "Unsupported package manager: $mgr"; return 1 ;;
   esac
   ok "System update complete."
@@ -356,8 +360,31 @@ x27_virtualization_setup() {
   ok "Virtualization Setup complete. You can now run virt-manager."
 }
 
+# NEW ACTION: Deploy Server Updater
+x27_server_updater() {
+  echo
+  inf "Deploy Server Updater"
+  msg " - Installs a universal Linux updater (update-system)"
+  msg " - Logs and safely upgrades Debian/Ubuntu or RHEL/Fedora/CentOS systems"
+  msg " - Sets up a cron job at your chosen day/time (optional auto-reboot)"
+  echo
+  if ! confirm "Proceed with Server Updater setup?"; then
+    warn "Canceled."; return 0
+  fi
+
+  ensure_wget || return 1
+
+  inf "Downloading Server Updater script to ./$SERVER_UPDATER_LOCAL_NAME"
+  run bash -c "wget -qO '$SERVER_UPDATER_LOCAL_NAME' '$SERVER_UPDATER_URL'"
+  run chmod +x "$SERVER_UPDATER_LOCAL_NAME"
+
+  inf "Executing: sudo bash $SERVER_UPDATER_LOCAL_NAME"
+  run sudo_maybe bash "$SERVER_UPDATER_LOCAL_NAME"
+  ok "Server Updater deployed."
+}
+
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" )
+declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" )
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
@@ -365,6 +392,7 @@ declare -a DESCRIPTIONS=(
   "Debian Desktop Setup (CLI→KDE)."
   "YT Downloader: Local script; skips install if yt-dlp is present."
   "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
+  "Deploy Server Updater: Universal updater + cron job (optional auto-reboot)."
 )
 
 list_actions() {
@@ -383,6 +411,7 @@ run_action() {
     debian_desktop_setup) x27_debian_desktop_setup "$@";;
     yt_downloader)        x27_yt_downloader "$@";;
     virtualization_setup) x27_virtualization_setup "$@";;
+    server_updater)       x27_server_updater "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
