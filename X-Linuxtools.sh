@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, server_deploy, debian_desktop_setup, yt_downloader
+# X27 — sysinfo, update, cleanup, server_deploy, debian_desktop_setup, yt_downloader, virtualization_setup
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.3"
+VERSION="0.6.4"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -19,6 +19,10 @@ DEBIAN_POST_LOCAL_NAME="Debian-Post-Installer.sh"
 DEBIAN_POST_LOCAL_FALLBACK="/Scripts/Debian-Post-Installer.sh"
 
 YTDL_PY_URL="https://raw.githubusercontent.com/GamerX27/YT-Downloader-Script/refs/heads/main/YT-Downloader-Cli.py"
+
+VIRT_LOCAL_FALLBACK="/Scripts/Virtualization_Setup.sh"
+VIRT_LOCAL_NAME="Virtualization_Setup.sh"
+VIRT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Virtualization_Setup.sh"
 
 # Colors (respects NO_COLOR)
 if [[ -z "${NO_COLOR}" ]]; then
@@ -347,8 +351,37 @@ x27_yt_downloader() {
   ok "YT Downloader finished. Files are in ./YT-Downloads"
 }
 
+x27_virtualization_setup() {
+  echo
+  inf "Virtualization Setup (KVM/QEMU + virt-manager)"
+  msg " - Installs QEMU/KVM, libvirt, and virt-manager"
+  msg " - Updates package index; enables & starts libvirtd"
+  msg " - Configures default NAT network; optional bridged networking"
+  msg " - Adds your user to the libvirt group for VM management"
+  echo
+  if ! confirm "Proceed with Virtualization Setup?"; then
+    warn "Canceled."; return 0
+  fi
+
+  local runner=""
+  if [[ -f "$VIRT_LOCAL_FALLBACK" ]]; then
+    inf "Found local script: $VIRT_LOCAL_FALLBACK"
+    runner="$VIRT_LOCAL_FALLBACK"
+  else
+    ensure_wget || return 1
+    inf "Downloading virtualization script to ./$VIRT_LOCAL_NAME"
+    run bash -c "wget -qO '$VIRT_LOCAL_NAME' '$VIRT_URL'"
+    run chmod +x "$VIRT_LOCAL_NAME"
+    runner="./$VIRT_LOCAL_NAME"
+  fi
+
+  inf "Executing: $runner"
+  run sudo_maybe bash "$runner"
+  ok "Virtualization Setup complete. You can now run virt-manager."
+}
+
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "server_deploy" "debian_desktop_setup" "yt_downloader" )
+declare -a ACTIONS=( "sysinfo" "update" "cleanup" "server_deploy" "debian_desktop_setup" "yt_downloader" "virtualization_setup" )
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
@@ -356,6 +389,7 @@ declare -a DESCRIPTIONS=(
   "X27 ServerDeploy: install Docker (official repo), optional Portainer, and updater."
   "Debian Desktop Setup (CLI→KDE)."
   "YT Downloader: Local script; skips install if yt-dlp is present."
+  "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT/optional bridge."
 )
 
 list_actions() {
@@ -374,6 +408,7 @@ run_action() {
     server_deploy)        x27_server_deploy "$@";;
     debian_desktop_setup) x27_debian_desktop_setup "$@";;
     yt_downloader)        x27_yt_downloader "$@";;
+    virtualization_setup) x27_virtualization_setup "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
