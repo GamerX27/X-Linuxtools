@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.6"
+VERSION="0.6.7"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -164,7 +164,7 @@ ensure_ytdlp() {
     dnf)    run sudo_maybe dnf -y install yt-dlp && ok="true" ;;
     yum)    run sudo_maybe yum -y install yt-dlp && ok="true" || true ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm yt-dlp && ok="true" ;;
-    zypper) run sudo_maybe zyper --non-interactive in yt-dlp && ok="true" || true ;;
+    zypper) run sudo_maybe zypper --non-interactive in yt-dlp && ok="true" || true ;;
     *)      ok="false" ;;
   esac
   if [[ "$ok" != "true" ]]; then
@@ -188,6 +188,15 @@ ensure_yt_deps() {
   ensure_ffmpeg  || return 1
   ensure_ytdlp   || return 1
   ok "All YT Downloader dependencies are present."
+}
+
+# -------- Safe clear helper --------
+safe_clear() {
+  if command -v clear >/dev/null 2>&1; then
+    clear
+  else
+    printf '\n%.0s' {1..5}
+  fi
 }
 
 # -------- Actions --------
@@ -360,7 +369,7 @@ x27_virtualization_setup() {
   fi
 
   inf "Executing: $runner"
-  run sudo_maybe bash "$runner"
+  run sudo_maybe bash "$VIRT_LOCAL_NAME"
   ok "Virtualization Setup complete. You can now run virt-manager."
 }
 
@@ -387,7 +396,7 @@ x27_server_updater() {
   ok "Server Updater deployed."
 }
 
-# NEW: Docker install
+# Docker install
 x27_docker_install() {
   echo
   inf "Docker Install"
@@ -412,7 +421,17 @@ x27_docker_install() {
 }
 
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" )
+declare -a ACTIONS=( \
+  "sysinfo" \
+  "update" \
+  "cleanup" \
+  "debian_desktop_setup" \
+  "yt_downloader" \
+  "virtualization_setup" \
+  "server_updater" \
+  "docker_install" \
+)
+
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
@@ -448,7 +467,7 @@ run_action() {
 
 # -------- Menu --------
 menu() {
-  clear
+  safe_clear
   echo "${CYA}============================================${RST}"
   echo "${BOLD}${APP_NAME}${RST} ${DIM}- Your Linux Utility Toolbox${RST}"
   echo "${CYA}============================================${RST}"
@@ -470,7 +489,7 @@ menu() {
           local action="${ACTIONS[$((choice-1))]}"
           echo; inf "Running: $action"; run_action "$action"; echo
           read -rp "Press Enter to continue..." _ || true
-          clear; menu; return
+          safe_clear; menu; return
         else
           warn "Invalid selection."
         fi
