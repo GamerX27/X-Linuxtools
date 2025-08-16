@@ -267,20 +267,22 @@ x27_server_deploy() {
   cat >"$tmp_script" <<'X27SERVERDEPLOY'
 #!/bin/bash
 
-GREEN="\033[0;32m"
-RED="\033[0;31m"
-CYAN="\033[0;36m"
-BOLD="\033[1m"
-NC="\033[0m"
+GREEN="[0;32m"
+RED="[0;31m"
+CYAN="[0;36m"
+BOLD="[1m"
+NC="[0m"
 
 print_banner() {
-  echo -e "\n\033[1;34m"
+  echo -e "
+[1;34m"
   echo "######################################################################"
   echo "#                                                                    #"
   echo "#                X27 Docker & Update Setup Script                    #"
   echo "#                                                                    #"
   echo "######################################################################"
-  echo -e "\033[0m\n"
+  echo -e "[0m
+"
 }
 
 print_success() { echo -e "${GREEN}$1${NC}"; }
@@ -318,11 +320,11 @@ install_update_script() {
   echo -e "${CYAN}${BOLD}📦 Deploying update script to $TARGET...${NC}"
   sudo tee "$TARGET" > /dev/null <<'EOF'
 #!/bin/bash
-GREEN="\033[0;32m"
-CYAN="\033[0;36m"
-RED="\033[0;31m"
-BOLD="\033[1m"
-NC="\033[0m"
+GREEN="[0;32m"
+CYAN="[0;36m"
+RED="[0;31m"
+BOLD="[1m"
+NC="[0m"
 
 echo -e "${CYAN}${BOLD}🧼 Starting full system update...${NC}"
 
@@ -351,9 +353,8 @@ print_banner
 
 install_docker
 
-if [ -t 0 ] && [ -r /dev/tty ]; then
-  printf "Do you want to install Portainer CE? (Y/y = Yes, N/n = No): " > /dev/tty
-  IFS= read -r ans_portainer < /dev/tty
+if [[ -t 0 && -r /dev/tty ]]; then
+  read -r -p "Do you want to install Portainer CE? (Y/y = Yes, N/n = No): " ans_portainer </dev/tty || ans_portainer="n"
 else
   ans_portainer="n"
 fi
