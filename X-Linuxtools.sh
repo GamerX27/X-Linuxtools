@@ -389,7 +389,7 @@ declare -a DESCRIPTIONS=(
   "X27 ServerDeploy: install Docker (official repo), optional Portainer, and updater."
   "Debian Desktop Setup (CLI→KDE)."
   "YT Downloader: Local script; skips install if yt-dlp is present."
-  "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT/optional bridge."
+  "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
 )
 
 list_actions() {
