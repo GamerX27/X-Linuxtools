@@ -356,7 +356,7 @@ x27_virtualization_setup() {
   inf "Virtualization Setup (KVM/QEMU + virt-manager)"
   msg " - Installs QEMU/KVM, libvirt, and virt-manager"
   msg " - Updates package index; enables & starts libvirtd"
-  msg " - Configures default NAT network; optional bridged networking"
+  msg " - Configures default NAT network"
   msg " - Adds your user to the libvirt group for VM management"
   echo
   if ! confirm "Proceed with Virtualization Setup?"; then
