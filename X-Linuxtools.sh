@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, server_deploy, debian_desktop_setup, yt_downloader, virtualization_setup
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.5-integrated"
+VERSION="0.6.4"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
 DRY_RUN="${X27_DRY_RUN:-false}"
 NO_COLOR="${NO_COLOR:-}"
 
-SERVERDEPLOY_URL="https://raw.githubusercontent.com/GamerX27/Homelab-X27/refs/heads/main/Serverdeploy.sh"  # legacy (unused now)
 DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
 DEBIAN_POST_LOCAL_NAME="Debian-Post-Installer.sh"
 DEBIAN_POST_LOCAL_FALLBACK="/Scripts/Debian-Post-Installer.sh"
@@ -106,19 +105,6 @@ ensure_wget() {
     pacman) run sudo_maybe pacman -Sy --noconfirm wget ;;
     zypper) run sudo_maybe zypper --non-interactive in wget ;;
     *)      err "Unknown package manager. Please install wget manually."; return 1 ;;
-  esac
-}
-
-ensure_curl() {
-  if have curl; then return 0; fi
-  warn "curl not found. Installing curl…"
-  case "$(detect_pkg)" in
-    apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y install curl ;;
-    dnf)    run sudo_maybe dnf -y install curl ;;
-    yum)    run sudo_maybe yum -y install curl ;;
-    pacman) run sudo_maybe pacman -Sy --noconfirm curl ;;
-    zypper) run sudo_maybe zypper --non-interactive in curl ;;
-    *)      err "Unknown package manager. Please install curl manually."; return 1 ;;
   esac
 }
 
@@ -248,135 +234,6 @@ x27_cleanup() {
   ok "Cleanup done."
 }
 
-# NOTE: server_deploy action fully replaced to run a dedicated Bash script (#!/bin/bash)
-x27_server_deploy() {
-  echo
-  inf "X27 ServerDeploy (integrated)"
-  msg " - Installs Docker via get.docker.com"
-  msg " - Optional Portainer CE"
-  msg " - Deploys /usr/local/bin/update helper (OS + Flatpak + Docker via Watchtower)"
-  echo
-  warn "This will download and execute Docker's official install script (get.docker.com)."
-  if ! confirm "Proceed with integrated server deploy?"; then warn "Canceled."; return 0; fi
-
-  ensure_curl || return 1
-
-  # Build a temp script that uses #!/bin/bash as requested
-  local tmp_script
-  tmp_script="$(mktemp /tmp/x27_serverdeploy.XXXXXX.sh)"
-  cat >"$tmp_script" <<'X27SERVERDEPLOY'
-#!/bin/bash
-
-GREEN="[0;32m"
-RED="[0;31m"
-CYAN="[0;36m"
-BOLD="[1m"
-NC="[0m"
-
-print_banner() {
-  echo -e "
-[1;34m"
-  echo "######################################################################"
-  echo "#                                                                    #"
-  echo "#                X27 Docker & Update Setup Script                    #"
-  echo "#                                                                    #"
-  echo "######################################################################"
-  echo -e "[0m
-"
-}
-
-print_success() { echo -e "${GREEN}$1${NC}"; }
-print_error()   { echo -e "${RED}$1${NC}"; }
-
-install_docker() {
-  echo "Downloading Docker installation script..."
-  curl -fsSL https://get.docker.com -o get-docker.sh
-  echo "Running Docker installation script..."
-  sudo sh get-docker.sh
-  if [ $? -eq 0 ]; then
-    print_success "Docker installed successfully!"
-  else
-    print_error "Docker installation failed!"; exit 1
-  fi
-  rm -f get-docker.sh
-}
-
-install_portainer() {
-  echo "Creating Docker volume for Portainer..."
-  sudo docker volume create portainer_data
-  echo "Running Portainer CE container..."
-  sudo docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always \
-    -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data \
-    portainer/portainer-ce:latest
-  if [ $? -eq 0 ]; then
-    print_success "Portainer CE installed successfully!"
-  else
-    print_error "Portainer CE installation failed!"
-  fi
-}
-
-install_update_script() {
-  TARGET="/usr/local/bin/update"
-  echo -e "${CYAN}${BOLD}📦 Deploying update script to $TARGET...${NC}"
-  sudo tee "$TARGET" > /dev/null <<'EOF'
-#!/bin/bash
-GREEN="[0;32m"
-CYAN="[0;36m"
-RED="[0;31m"
-BOLD="[1m"
-NC="[0m"
-
-echo -e "${CYAN}${BOLD}🧼 Starting full system update...${NC}"
-
-if command -v dnf >/dev/null 2>&1; then PM="dnf"; elif command -v apt >/dev/null 2>&1; then PM="apt"; else echo -e "${RED}❌ No supported package manager found (dnf or apt).${NC}"; exit 1; fi
-
-echo -e "${GREEN}📦 Updating system packages with $PM...${NC}"
-if [ "$PM" = "dnf" ]; then sudo dnf upgrade --refresh -y; else sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y; fi
-
-if command -v flatpak >/dev/null 2>&1; then echo -e "${GREEN}📦 Updating Flatpaks...${NC}"; flatpak update -y; fi
-
-if command -v docker >/dev/null 2>&1; then
-  CONTAINER_COUNT=$(sudo docker ps -a -q | wc -l)
-  if [ "$CONTAINER_COUNT" -eq 0 ]; then echo -e "${CYAN}📭 No Docker containers found. Skipping Watchtower.${NC}"; else echo -e "${GREEN}🚀 Running Watchtower once to update containers...${NC}"; sudo docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower --run-once --cleanup; fi
-else
-  echo -e "${CYAN}⚠️ Docker not installed. Skipping container updates.${NC}"
-fi
-
-echo -e "${BOLD}${GREEN}✅ System update completed successfully!${NC}"
-EOF
-  printf "%b❓ Make the script executable with chmod +x? [y/n]: %b" "${BOLD}" "${NC}" > /dev/tty
-  IFS= read -r confirm < /dev/tty
-  case "$confirm" in [Yy]*) sudo chmod +x "$TARGET"; echo -e "${GREEN}✅ Script is now executable. You can run it with: ${BOLD}update${NC}";; [Nn]*) echo -e "${RED}⚠️ Skipped chmod. You must run this manually if you want to execute the script:${NC}"; echo -e "${BOLD} sudo chmod +x $TARGET${NC}";; *) echo -e "${RED}Invalid choice. Defaulting to skip chmod.${NC}";; esac
-}
-
-print_banner
-
-install_docker
-
-if [[ -t 0 && -r /dev/tty ]]; then
-  read -r -p "Do you want to install Portainer CE? (Y/y = Yes, N/n = No): " ans_portainer </dev/tty || ans_portainer="n"
-else
-  ans_portainer="n"
-fi
-
-case "$ans_portainer" in
-  Y|y) install_portainer ;;
-  N|n) echo "Skipping Portainer installation." ;;
-  *)   echo "Invalid choice. Skipping Portainer installation." ;;
-fi
-
-install_update_script
-
-echo; print_success "X27 Docker & Update Setup completed!"
-X27SERVERDEPLOY
-
-  chmod +x "$tmp_script"
-  inf "Executing integrated server deploy script ($tmp_script)…"
-  run bash "$tmp_script"
-  rm -f "$tmp_script" || true
-  ok "ServerDeploy finished."
-}
-
 x27_debian_desktop_setup() {
   echo
   inf "Debian Desktop Setup (CLI → KDE)"
@@ -500,12 +357,11 @@ x27_virtualization_setup() {
 }
 
 # -------- Registration --------
-declare -a ACTIONS=( "sysinfo" "update" "cleanup" "server_deploy" "debian_desktop_setup" "yt_downloader" "virtualization_setup" )
+declare -a ACTIONS=( "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" )
 declare -a DESCRIPTIONS=(
   "Show basic system information (CPU/mem/disk)."
   "Update system packages (asks for confirmation)."
   "Clean caches/logs safely (asks for confirmation)."
-  "X27 ServerDeploy: install Docker (official get.docker.com), optional Portainer, and update helper."
   "Debian Desktop Setup (CLI→KDE)."
   "YT Downloader: Local script; skips install if yt-dlp is present."
   "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
@@ -524,7 +380,6 @@ run_action() {
     sysinfo)              x27_sysinfo "$@";;
     update)               x27_update "$@";;
     cleanup)              x27_cleanup "$@";;
-    server_deploy)        x27_server_deploy "$@";;
     debian_desktop_setup) x27_debian_desktop_setup "$@";;
     yt_downloader)        x27_yt_downloader "$@";;
     virtualization_setup) x27_virtualization_setup "$@";;
