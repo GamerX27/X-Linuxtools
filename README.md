@@ -1,124 +1,86 @@
-# X27 — Tiny Linux Toolbox (X‑Linuxtools)
+# X‑Linuxtools
 
-A small, batteries‑included Bash toolbox for common Linux chores. Use it interactively via a clean menu or call actions directly from the CLI.
+A Bash‑based toolkit for common Linux administration tasks. It supports both an interactive terminal menu and direct, non‑interactive command‑line invocation.
 
-> **Highlights**
->
-> * Cross‑distro: works with `apt`, `dnf`, and `pacman`
-> * Safe by default: prompts before doing anything destructive
-> * Ephemeral logs per run in `~/.local/share/x27/logs`
-> * Color output (respects `NO_COLOR`)
+## Features
+
+* Cross‑distribution support (`apt`, `dnf`/`yum`, `pacman`, `zypper`).
+* Confirmation prompts before operations that change system state.
 
 ---
-
-## Contents / What it does
-
-X27 ships one main script and a few helper scripts:
 
 **Main entry point**
 
-* `X-Linuxtools.sh` — the CLI & menu app (aka **X27**)
+* `X-Linuxtools.sh` — command‑line utility and interactive menu.
 
-**Helper scripts** (called by actions below)
+**Helper scripts**
 
-* `Scripts/Debian-Post-Installer.sh` — opinionated Debian desktop bootstrap (CLI → KDE, Flatpak, etc.)
-* `Scripts/Virtualization_Setup.sh` — QEMU/KVM + libvirt + virt‑manager on apt/dnf/pacman
-* `Scripts/Server-Updater.sh` — installs a cross‑distro updater and schedules it with cron
-* `Scripts/Docker-Install.sh` — installs Docker Engine using the official repos and enables the service
-
-### Built‑in actions
-
-Run with **no args** to get a menu, or call an action directly:
-
-```
-./X-Linuxtools.sh <action>
-```
-
-Actions available:
-
-* `sysinfo` – Show basic system information (CPU, memory, disk, kernel, uptime, distro).
-* `update` – Update system packages (uses your distro’s package manager; asks for confirmation).
-* `cleanup` – Safely clean caches/logs; asks for confirmation.
-* `debian_desktop_setup` – Debian CLI → KDE setup (installs `kde-standard`, Flatpak + Discover backend, `fish`, `fastfetch`, `vlc`, and more). **Reboots at the end.**
-* `yt_downloader` – Run a YouTube downloader (uses a local script if available; skips install if `yt-dlp` is already present).
-* `virtualization_setup` – Install & enable KVM/QEMU, libvirt, virt‑manager; set up the default NAT network; add the invoking user to `libvirt`/`kvm` groups.
-* `server_updater` – Deploy a universal update routine with a scheduled cron job. Creates `/usr/local/sbin/os_update.sh` plus `/usr/local/bin/update-system`, prompts for a day/time schedule, and logs to `/var/log/os_update.log`. Supports `--dry-run`.
-* `docker_install` – Install Docker Engine from the official repos (Debian/RHEL‑like), enable & start the `docker` service, add the invoking user to the `docker` group, and run the `hello-world` test.
-
-> Tip: Get a quick list any time with `./X-Linuxtools.sh --list`.
+* `Scripts/Debian-Post-Installer.sh` — Debian desktop bootstrap (KDE, Flatpak, common tools).
+* `Scripts/Virtualization_Setup.sh` — QEMU/KVM, libvirt, virt‑manager; default NAT network; group membership.
+* `Scripts/Server-Updater.sh` — cross‑distro update routine with a cron schedule and logging.
+* `Scripts/Docker-Install.sh` — Docker Engine from the official repositories; service enablement and basic verification.
 
 ---
 
-## Quick start
+## Usage
 
 ```bash
-# Make it executable and run
+# Make executable and start the interactive menu
 chmod +x X-Linuxtools.sh
-./X-Linuxtools.sh         # interactive menu
-./X-Linuxtools.sh update  # run a specific action
+./X-Linuxtools.sh
+
+# List available actions
+./X-Linuxtools.sh --list
+
+# Run a specific action non‑interactively
+./X-Linuxtools.sh <action>
 ```
 
-### One‑link command (WIP)
+### Available actions
 
-A single **one‑link** command to run X27 directly from GitHub is being prepared. The planned UX will be something like:
+* `sysinfo` — display basic system information (host, user, kernel, uptime, CPU, memory, and disk summaries).
+* `update` — update system packages using the detected package manager (confirmation required).
+* `cleanup` — clean package caches and old logs where supported; optional systemd‑journal vacuum.
+* `debian_desktop_setup` — convert a fresh Debian CLI install into a KDE desktop (includes Flatpak/Discover, common tools). Reboots at the end.
+* `yt_downloader` — launch a local YouTube downloader helper (uses `yt-dlp` and `ffmpeg`; fetches the Python helper if needed).
+* `virtualization_setup` — install and configure KVM/QEMU, libvirt, and virt‑manager; enable the default NAT network and add the invoking user to the appropriate groups.
+* `server_updater` — install a universal update routine and schedule it with cron (with logging and optional `--dry-run`).
+* `docker_install` — install Docker Engine from the official repositories, enable and start the service, add the user to the `docker` group, and run a basic verification.
+
+---
+
+### One‑link runner (work in progress)
+
+A single command to run X‑Linuxtools directly is in progress not sure when it will be final prime to use ass:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/<USER>/<REPO>/main/X-Linuxtools.sh)
 ```
 
-> Until that’s finalized, clone or download the repo and run the script locally. As always, review scripts before piping from the internet.
+Until this is finalised, clone or download the repository and run the script locally.
 
----
+## Supported distributions
 
-## CLI flags & environment
-
-```
-./X-Linuxtools.sh --help      # usage
-./X-Linuxtools.sh --version   # print version
-./X-Linuxtools.sh --list      # list actions
-./X-Linuxtools.sh --dry-run   # preview commands without making changes
-```
-
-Environment variables:
-
-* `X27_LOG_DIR` – custom log directory (default: `~/.local/share/x27/logs`)
-* `X27_CONF_DIR` – config directory (default: `~/.config/x27`)
-* `X27_DRY_RUN`  – set to `true` to force dry‑run
-* `NO_COLOR`     – disable colored output if set
-
----
-
-## Distro support
-
-X27 autodetects the package manager and supports:
+The toolkit autodetects the available package manager and supports:
 
 * `apt` (Debian/Ubuntu and derivatives)
-* `dnf` (Fedora/RHEL/Alma/Rocky/CentOS Stream/Oracle Linux)
+* `dnf` / `yum` (Fedora/RHEL/Alma/Rocky/CentOS Stream/Oracle Linux)
 * `pacman` (Arch/Manjaro/EndeavourOS, etc.)
+* `zypper` (openSUSE)
 
-Some actions require `sudo` and an active internet connection to fetch dependencies or helper scripts.
+Some actions require `sudo` privileges and an active internet connection, but would recommend running the script as root or sudo.
 
 ---
 
 ## Notes on specific actions
 
-* **Debian desktop setup** is intentionally opinionated and designed for fresh CLI installs. It installs KDE Plasma and common tools, adjusts a few system bits, and **reboots automatically** at the end.
-* **Virtualization setup** enables `libvirtd`, configures the default NAT network (`virbr0`), and adds your user to `libvirt`/`kvm`. Log out/in if group changes don’t take effect right away.
-* **Server updater** writes a small, distro‑aware update routine, installs a wrapper command, and asks when to run it via cron. Logs go to `/var/log/os_update.log`.
-* **Docker install** configures the official Docker repository, installs `docker-ce`, `docker-ce-cli`, and `containerd.io`, starts/enables the service, and runs `hello-world` to verify.
-
----
-
-## Contributing
-
-Issues and PRs are welcome! If you’re proposing a new action, try to:
-
-1. Keep it cross‑distro (or clearly gate by distro).
-2. Prompt before destructive changes and offer `--dry-run`.
-3. Log meaningful steps and exit with helpful errors.
+* **Debian desktop setup** installs KDE Plasma and common utilities, adjusts system settings, and reboots to complete installation.
+* **Virtualization setup** enables and starts `libvirtd`, configures the default NAT network (`virbr0`), and adds the invoking user to the `libvirt`/`kvm` groups. Log out/in if group changes do not take effect immediately.
+* **Server updater** deploys a small, distro‑aware update routine, installs a wrapper command, prompts for a schedule (cron), and logs to `/var/log/os_update.log`.
+* **Docker install** configures the official Docker repository, installs `docker-ce`, `docker-ce-cli`, and `containerd.io` (plus plugins where applicable), enables/starts the service, and verifies the installation.
 
 ---
 
 ## License
 
-[MIT](./LICENSE) © 2025 X27
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
