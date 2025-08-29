@@ -13,8 +13,8 @@ apt install -y kde-standard
 echo "Installing Flatpak and Discover Flatpak Backend..."
 apt install -y flatpak plasma-discover-backend-flatpak
 
-echo "Installing fish, fastfetch, and VLC..."
-apt install -y fish fastfetch vlc
+echo "Installing fish, fastfetch, papirus theme and VLC..."
+apt install -y fish fastfetch vlc papirus-icon-theme
 
 echo "Adding Flathub repository (if not already added)..."
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
