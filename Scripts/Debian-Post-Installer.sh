@@ -7,6 +7,28 @@ export DEBIAN_FRONTEND=noninteractive
 echo "Updating package list..."
 apt update
 
+echo "Checking for firefox-esr..."
+if dpkg -l | grep -q "^ii  firefox-esr "; then
+    echo "firefox-esr is installed. Removing..."
+    apt purge -y firefox-esr
+    apt autoremove -y
+else
+    echo "firefox-esr not found. Skipping removal."
+fi
+
+echo "Installing curl..."
+apt install -y curl
+
+echo "Adding Brave Browser repository..."
+curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
+
+echo "Updating package list (Brave included)..."
+apt update
+
+echo "Installing Brave Browser..."
+apt install -y brave-browser
+
 echo "Installing KDE Standard..."
 apt install -y kde-standard
 
