@@ -7,15 +7,6 @@ export DEBIAN_FRONTEND=noninteractive
 echo "Updating package list..."
 apt update
 
-echo "Checking for firefox-esr..."
-if dpkg -l | grep -q "^ii  firefox-esr "; then
-    echo "firefox-esr is installed. Removing..."
-    apt purge -y firefox-esr
-    apt autoremove -y
-else
-    echo "firefox-esr not found. Skipping removal."
-fi
-
 echo "Installing curl..."
 apt install -y curl
 
@@ -40,6 +31,15 @@ apt install -y fish fastfetch vlc papirus-icon-theme
 
 echo "Adding Flathub repository (if not already added)..."
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+echo "Checking for firefox-esr..."
+if dpkg -l | grep -q "^ii  firefox-esr "; then
+    echo "firefox-esr is installed. Removing..."
+    apt purge -y firefox-esr
+    apt autoremove -y
+else
+    echo "firefox-esr not found. Skipping removal."
+fi
 
 echo "Cleaning up APT..."
 apt autoremove -y
@@ -70,6 +70,20 @@ else
     echo "Skipping boot splash setup."
 fi
 # ---------------------------------------------------
+
+# --- Optional: Convert to Debian Sid before reboot ---
+read -p "Do you want to convert this install to Debian Sid (rolling)? [y/N]: " to_sid
+if [[ "$to_sid" =~ ^[Yy]$ ]]; then
+    echo "Downloading and running Debian Sid conversion script..."
+    tmp_sid_script="$(mktemp -p /tmp Deb-Sid.XXXXXX.sh)"
+    wget -O "$tmp_sid_script" "https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Deb-Sid.sh"
+    chmod +x "$tmp_sid_script"
+    bash "$tmp_sid_script"
+    echo "Debian Sid conversion script finished."
+else
+    echo "Skipping Debian Sid conversion."
+fi
+# -----------------------------------------------------
 
 # Countdown before reboot
 echo "Removing /etc/network/interfaces..."
