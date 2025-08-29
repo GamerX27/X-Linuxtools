@@ -23,23 +23,27 @@ echo "Cleaning up APT..."
 apt autoremove -y
 apt clean
 
-# --- Optional Boot screen setup (Debian default) ---
-read -p "Do you want to enable the Debian boot splash screen? [y/N]: " enable_splash
+# --- Optional Boot screen setup (Breeze theme) ---
+read -p "Do you want to enable the Breeze boot splash screen? [y/N]: " enable_splash
 if [[ "$enable_splash" =~ ^[Yy]$ ]]; then
-    echo "Installing Plymouth (Debian default boot splash)..."
+    echo "Installing Plymouth and Breeze theme..."
     apt install -y plymouth plymouth-themes
+    apt install -y plymouth-theme-breeze kde-config-plymouth
 
-    echo "Setting Debian default Plymouth theme..."
-    if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-        plymouth-set-default-theme debian-logo
+    echo "Ensuring GRUB has 'quiet splash'..."
+    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+        sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' /etc/default/grub
     else
-        echo "plymouth-set-default-theme not found; proceeding to update initramfs."
+        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >> /etc/default/grub
     fi
 
-    echo "Updating initramfs so the splash applies on next boot..."
-    update-initramfs -u
+    echo "Updating GRUB..."
+    update-grub2
 
-    echo "Debian default boot splash enabled."
+    echo "Setting Breeze theme for Plymouth..."
+    plymouth-set-default-theme -R breeze
+
+    echo "Breeze boot splash enabled."
 else
     echo "Skipping boot splash setup."
 fi
