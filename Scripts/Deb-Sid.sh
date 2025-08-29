@@ -43,8 +43,8 @@ echo "Backups saved in: $BACKUP_DIR"
 #----- write new sources.list --------------------------------------------------
 # Binary + source entries for sid with main contrib non-free non-free-firmware
 cat >/etc/apt/sources.list <<'EOF'
-deb http://deb.debian.org/debian sid main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian sid main contrib non-free non-free-firmware
+deb http://ftp.no.debian.org/debian sid main contrib non-free non-free-firmware
+deb-src http://ftp.no.debian.org/debian sid main contrib non-free non-free-firmware
 EOF
 
 echo "Wrote new /etc/apt/sources.list for Debian Sid."
