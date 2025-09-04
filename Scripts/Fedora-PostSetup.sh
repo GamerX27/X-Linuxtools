@@ -1,79 +1,42 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env bash
 
-sudo dnf -y update
-
-sudo dnf -y install \
-  "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
-  "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
-
-sudo dnf -y update @core
-
-curl -fsS https://dl.brave.com/install.sh | sh
-
-sudo dnf -y swap ffmpeg-free ffmpeg --allowerasing
-
-sudo dnf -y update @multimedia \
-  --setopt="install_weak_deps=False" \
-  --exclude=PackageKit-gstreamer-plugin
-
-echo "Select your option:"
-echo "  1) Intel (recent GPUs)"
-echo "  2) Intel (older GPUs)"
-echo "  3) AMD GPUs"
-echo "  4) VM / Skip GPU driver setup"
-
-read -rp "Enter 1, 2, 3, or 4: " choice
-case "$choice" in
-    1) sudo dnf -y install intel-media-driver ;;
-    2) sudo dnf -y install libva-intel-driver ;;
-    3)
-        sudo dnf -y swap mesa-va-drivers mesa-va-drivers-freeworld
-        sudo dnf -y swap mesa-vdpau-drivers mesa-vdpau-drivers-freeworld
-        sudo dnf -y swap mesa-va-drivers.i686 mesa-va-drivers-freeworld.i686
-        sudo dnf -y swap mesa-vdpau-drivers.i686 mesa-vdpau-drivers-freeworld.i686
-        ;;
-    4) echo "Skipping GPU/media driver installation (VM/Skip selected)" ;;
-    *) echo "Invalid choice. Skipping GPU/media driver installation." ;;
-esac
-
-flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
-sudo dnf remove libreoffice\* dragon juk elisa
-
-sudo dnf -y install fish papirus-icon-theme vlc fastfetch
-
+# Prompt function
 ask_install() {
     local app_name="$1"
     local flatpak_id="$2"
-    read -p "Install ${app_name}? (y/n): " answer
-    case "${answer,,}" in
-        y|yes)
-            echo "Installing ${app_name}..."
-            flatpak install flathub "${flatpak_id}" -y
-            ;;
-        *)
-            echo "Skipping ${app_name}."
-            ;;
-    esac
+    while true; do
+        read -p "Install ${app_name}? (y/n): " answer
+        case "${answer,,}" in
+            y|yes)
+                echo "Installing ${app_name}..."
+                flatpak install flathub "${flatpak_id}" -y
+                break
+                ;;
+            n|no)
+                echo "Skipping ${app_name}."
+                break
+                ;;
+            *)
+                echo "Please answer 'y' or 'n'."
+                ;;
+        esac
+    done
     echo
 }
 
-# Add Flathub remote if not already added
+echo "=== Installing extras ==="
+
+# Ensure Flathub is enabled
 if ! flatpak remotes | grep -q "^flathub"; then
-    echo "Adding Flathub remote..."
+    echo "Adding Flathub repository..."
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     echo
 fi
 
-# Optional apps and their Flatpak IDs
+# Installation prompts for extras
 ask_install "Cryptomator" "org.cryptomator.Cryptomator"
 ask_install "Bitwarden" "com.bitwarden.desktop"
-ask_install "LocalSend" "com.localsend.LocalSend"
+ask_install "LocalSend" "org.localsend.localsend_app"
 ask_install "Syncthing" "com.syncthing.Syncthing"
 
-echo "All done."
-
-
-
-echo "=== Setup complete ✅ ==="
+echo "=== Extras processing complete ==="
