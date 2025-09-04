@@ -19,8 +19,9 @@ echo "Select your option:"
 echo "  1) Intel (recent GPUs)"
 echo "  2) Intel (older GPUs)"
 echo "  3) AMD GPUs"
+echo "  4) VM / Skip GPU driver setup"
 
-read -rp "Enter 1, 2, or 3: " choice
+read -rp "Enter 1, 2, 3, or 4: " choice
 case "$choice" in
     1) sudo dnf -y install intel-media-driver ;;
     2) sudo dnf -y install libva-intel-driver ;;
@@ -30,6 +31,7 @@ case "$choice" in
         sudo dnf -y swap mesa-va-drivers.i686 mesa-va-drivers-freeworld.i686
         sudo dnf -y swap mesa-vdpau-drivers.i686 mesa-vdpau-drivers-freeworld.i686
         ;;
+    4) echo "Skipping GPU/media driver installation (VM/Skip selected)" ;;
     *) echo "Invalid choice. Skipping GPU/media driver installation." ;;
 esac
 
