@@ -47,7 +47,7 @@ esac
 
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-sudo dnf remove libreoffice\* dragon juk elisa kmail -y
+sudo dnf remove libreoffice\* dragon juk elisa-player kmail -y
 
 sudo dnf -y install fish papirus-icon-theme vlc fastfetch
 
