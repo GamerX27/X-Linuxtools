@@ -43,4 +43,37 @@ sudo dnf remove libreoffice\* dragon juk elisa
 
 sudo dnf -y install fish papirus-icon-theme vlc fastfetch
 
+ask_install() {
+    local app_name="$1"
+    local flatpak_id="$2"
+    read -p "Install ${app_name}? (y/n): " answer
+    case "${answer,,}" in
+        y|yes)
+            echo "Installing ${app_name}..."
+            flatpak install flathub "${flatpak_id}" -y
+            ;;
+        *)
+            echo "Skipping ${app_name}."
+            ;;
+    esac
+    echo
+}
+
+# Add Flathub remote if not already added
+if ! flatpak remotes | grep -q "^flathub"; then
+    echo "Adding Flathub remote..."
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    echo
+fi
+
+# Optional apps and their Flatpak IDs
+ask_install "Cryptomator" "org.cryptomator.Cryptomator"
+ask_install "Bitwarden" "com.bitwarden.desktop"
+ask_install "LocalSend" "com.localsend.LocalSend"
+ask_install "Syncthing" "com.syncthing.Syncthing"
+
+echo "All done."
+
+
+
 echo "=== Setup complete ✅ ==="
