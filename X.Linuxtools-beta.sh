@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.9"
+VERSION="0.6.10"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -182,15 +182,108 @@ ensure_ytdlp() {
 ensure_yt_deps() { ensure_wget && ensure_python3 && ensure_ffmpeg && ensure_ytdlp; }
 
 # ================================ Actions ====================================
-# (unchanged actions sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install)
+x27_sysinfo() {
+  inf "Host: $(hostname)"; inf "User: $USER"; inf "Kernel: $(uname -srmo 2>/dev/null || uname -sr)"; inf "Uptime: $(uptime -p || true)"
+  if source /etc/os-release 2>/dev/null; then inf "Distro: ${NAME:-Unknown} ${VERSION:-}"; else inf "Distro: Unknown"; fi
+  echo; inf "CPU:"; lscpu 2>/dev/null | sed -n '1,8p' || true
+  echo; inf "Memory:"; free -h || true
+  echo; inf "Disk:"; df -hT --total | sed -n '1,10p' || true
+}
+
+x27_update() {
+  local mgr; mgr=$(detect_pkg) || { err "No supported package manager."; return 1; }
+  warn "This will update system packages using: $mgr"
+  confirm "Proceed with system update?" || { warn "Canceled."; return 0; }
+  case "$mgr" in
+    apt)    run ${USE_SUDO:-sudo} apt-get update; run ${USE_SUDO:-sudo} apt-get -y upgrade; run ${USE_SUDO:-sudo} apt-get -y autoremove ;;
+    dnf)    run ${USE_SUDO:-sudo} dnf -y upgrade ;;
+    yum)    run ${USE_SUDO:-sudo} yum -y update ;;
+    pacman) run ${USE_SUDO:-sudo} pacman -Syu --noconfirm ;;
+    zypper) run ${USE_SUDO:-sudo} zypper refresh; run ${USE_SUDO:-sudo} zypper update -y ;;
+    *)      err "Unsupported package manager: $mgr"; return 1 ;;
+  esac
+  ok "System update complete."
+}
+
+x27_cleanup() {
+  inf "Cleaning package caches and old logs where possible."
+  confirm "Proceed with cleanup?" || { warn "Canceled."; return 0; }
+  local mgr; mgr=$(detect_pkg) || true
+  case "$mgr" in
+    apt)     run ${USE_SUDO:-sudo} apt-get -y autoremove; run ${USE_SUDO:-sudo} apt-get -y autoclean ;;
+    dnf|yum) run ${USE_SUDO:-sudo} "$mgr" clean all -y ;;
+    pacman)  run ${USE_SUDO:-sudo} paccache -r -k2 2>/dev/null || true ;;
+    zypper)  run ${USE_SUDO:-sudo} zypper clean -a ;;
+  esac
+  if have journalctl && confirm "Vacuum systemd journal to 200M?"; then run ${USE_SUDO:-sudo} journalctl --vacuum-size=200M; fi
+  ok "Cleanup done."
+}
+
+x27_debian_desktop_setup() {
+  echo; inf "Debian Desktop Setup (CLI → KDE)"; msg " - KDE Standard, Flatpak+Discover, fish/fastfetch/VLC, Flathub, cleanup, reboot"
+  warn "Debian-focused. This will make desktop changes and trigger a reboot."
+  confirm "Run the Debian Desktop Setup now?" || { warn "Canceled."; return 0; }
+  local runner=""
+  if [[ -f "$DEBIAN_POST_LOCAL_FALLBACK" ]]; then inf "Found local: $DEBIAN_POST_LOCAL_FALLBACK"; runner="$DEBIAN_POST_LOCAL_FALLBACK"
+  else ensure_wget || return 1; inf "Downloading → ./$DEBIAN_POST_LOCAL_NAME"; run bash -c "wget -qO '$DEBIAN_POST_LOCAL_NAME' '$DEBIAN_POST_URL'"; run chmod +x "$DEBIAN_POST_LOCAL_NAME"; runner="./$DEBIAN_POST_LOCAL_NAME"; fi
+  inf "Executing: $runner"; run sudo_maybe bash "$runner"; ok "Debian Desktop Setup complete (system may reboot)."
+}
+
+x27_yt_downloader() {
+  echo; inf "YT Downloader (local script)"; msg " - yt-dlp + ffmpeg; downloads to ./YT-Downloads"
+  local fname="YT-Downloader-Cli.py"
+  if have yt-dlp; then
+    ok "yt-dlp detected"; have python3 || { err "python3 missing"; return 1; }
+    [[ -f "$fname" ]] || { have wget || { err "wget missing"; return 1; }; inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
+    inf "Launching: python3 $fname"; run python3 "$fname" || true; ok "Done. Files → ./YT-Downloads"; return 0
+  fi
+  warn "yt-dlp not found. Installing prerequisites…"; ensure_yt_deps || return 1
+  [[ -f "$fname" ]] || { inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
+  inf "Launching: python3 $fname"; run python3 "$fname" || true; ok "Done. Files → ./YT-Downloads"
+}
+
+x27_virtualization_setup() {
+  echo; inf "Virtualization Setup (KVM/QEMU + virt-manager)"; msg " - Installs QEMU/KVM, libvirt, virt-manager; enables libvirtd; NAT; group access"
+  confirm "Proceed with Virtualization Setup?" || { warn "Canceled."; return 0; }
+  local runner=""
+  if [[ -f "$VIRT_LOCAL_FALLBACK" ]]; then inf "Found local: $VIRT_LOCAL_FALLBACK"; runner="$VIRT_LOCAL_FALLBACK"
+  else ensure_wget || return 1; inf "Downloading → ./$VIRT_LOCAL_NAME"; run bash -c "wget -qO '$VIRT_LOCAL_NAME' '$VIRT_URL'"; run chmod +x "$VIRT_LOCAL_NAME"; runner="./$VIRT_LOCAL_NAME"; fi
+  inf "Executing: $runner"; run sudo_maybe bash "$runner"; ok "Virtualization ready. Try: virt-manager"
+}
+
+x27_server_updater() {
+  echo; inf "Deploy Server Updater"; msg " - Universal updater (update-system) + cron (optional auto-reboot)"
+  confirm "Proceed with Server Updater setup?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$SERVER_UPDATER_LOCAL_NAME"; run bash -c "wget -qO '$SERVER_UPDATER_LOCAL_NAME' '$SERVER_UPDATER_URL'"; run chmod +x "$SERVER_UPDATER_LOCAL_NAME"
+  inf "Executing: sudo bash $SERVER_UPDATER_LOCAL_NAME"; run sudo_maybe bash "$SERVER_UPDATER_LOCAL_NAME"; ok "Server Updater deployed."
+}
+
+x27_docker_install() {
+  echo; inf "Docker Install"; msg " - Detects Debian/RHEL; installs Docker Engine + plugins; adds user to docker group; optional Portainer"
+  confirm "Proceed with Docker Install?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$DOCKER_INSTALL_LOCAL_NAME"; run bash -c "wget -qO '$DOCKER_INSTALL_LOCAL_NAME' '$DOCKER_INSTALL_URL'"; run chmod +x "$DOCKER_INSTALL_LOCAL_NAME"
+  inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"; run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"; ok "Docker install routine finished (log out/in may be required for group changes)."
+}
 
 x27_fedora_postsetup() {
   echo; inf "Fedora Postsetup"
-  msg " - Runs Fedora post-setup script with KDE defaults and RPM Fusion repos."
+  msg " - Downloads and runs Fedora-PostSetup.sh (RPM Fusion, codecs, KDE bits, etc)."
+
+  # Warn if not Fedora/RHEL-like
+  if source /etc/os-release 2>/dev/null; then
+    if [[ ${ID_LIKE:-}${ID:-} != *"fedora"* && ${ID_LIKE:-}${ID:-} != *"rhel"* ]]; then
+      warn "Detected non-Fedora/RHEL base. This script targets Fedora."
+      confirm "Continue anyway?" || { warn "Canceled."; return 0; }
+    fi
+  fi
+
   confirm "Proceed with Fedora Postsetup?" || { warn "Canceled."; return 0; }
   ensure_wget || return 1
   inf "Downloading → ./$FEDORA_POST_LOCAL_NAME"
   run bash -c "wget -qO '$FEDORA_POST_LOCAL_NAME' '$FEDORA_POST_URL'"
+  [[ -s "$FEDORA_POST_LOCAL_NAME" ]] || { err "Download failed or empty file: $FEDORA_POST_LOCAL_NAME"; return 1; }
   run chmod +x "$FEDORA_POST_LOCAL_NAME"
   inf "Executing: sudo bash $FEDORA_POST_LOCAL_NAME"
   run sudo_maybe bash "$FEDORA_POST_LOCAL_NAME"
@@ -232,4 +325,55 @@ run_action() {
   esac
 }
 
-# usage, menu, cleanup_logs, main remain unchanged
+usage() {
+  printf "%s%s%s v%s\n" "$BOLD" "$APP_NAME" "$RST" "$VERSION"
+  echo "Minimal toolbox. Logs are deleted after each run."; echo
+  echo "Usage:"; echo "  $APP_CMD                 # interactive menu"; echo "  $APP_CMD <action>        # run a specific tool"; echo "  $APP_CMD --help | --list | --version"; echo "  $APP_CMD --dry-run <action>"; echo
+  echo "Actions:"; list_actions
+}
+
+# -------------------------------- Menu ---------------------------------------
+menu() {
+  safe_clear
+  echo "${CYA}============================================${RST}"
+  echo "${BOLD}${APP_NAME}${RST} ${DIM}- Your Linux Utility Toolbox${RST}"
+  echo "${CYA}============================================${RST}"; echo
+  local i; for (( i=0; i<${#ACTIONS[@]}; i++ )); do printf "%2d) %-22s %s\n" "$((i+1))" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"; done
+  echo " q) quit"; echo
+  while true; do
+    read -rp "Select an option: " choice || exit 0
+    case "$choice" in
+      q|Q) exit 0 ;;
+      '' ) continue ;;
+      *  ) if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice>=1 && choice<=${#ACTIONS[@]} )); then
+              local action="${ACTIONS[$((choice-1))]}"; echo; inf "Running: $action"; run_action "$action"; echo
+              read -rp "Press Enter to continue..." _ || true
+              safe_clear; menu; return
+            else warn "Invalid selection."; fi;;
+    esac
+  done
+}
+
+# Delete log on exit to keep the tool lightweight
+cleanup_logs() { [[ -f "$LOG_FILE" ]] && rm -f "$LOG_FILE"; }
+trap cleanup_logs EXIT
+
+# -------------------------------- CLI ----------------------------------------
+main() {
+  # Pre-run: ensure base deps (wget, curl, git, sudo) exist and install if possible
+  base_deps_check_install || exit 1
+
+  # Process CLI
+  if [[ $# -eq 0 ]]; then menu; exit 0; fi
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help|-h) usage; exit 0 ;;
+      --version) echo "$APP_NAME $VERSION"; exit 0 ;;
+      --list)    list_actions; exit 0 ;;
+      --dry-run) DRY_RUN=true; shift; continue ;;
+      -*)        err "Unknown option: $1"; usage; exit 1 ;;
+      *)         run_action "$1" "${@:2}"; exit $? ;;
+    esac
+  done
+}
+main "$@"
