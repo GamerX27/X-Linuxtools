@@ -33,10 +33,10 @@ LC_MEASUREMENT=nb_NO.UTF-8
 LC_PAPER=nb_NO.UTF-8
 EOF
 
-echo "Regenerating locales..."
-apt install -y locales
-locale-gen en_US.UTF-8 nb_NO.UTF-8
-update-locale
+#echo "Regenerating locales..."
+#apt install -y locales
+#locale-gen en_US.UTF-8 nb_NO.UTF-8
+#update-locale
 
 echo "Installing Flatpak and Discover Flatpak Backend..."
 apt install -y flatpak plasma-discover-backend-flatpak
