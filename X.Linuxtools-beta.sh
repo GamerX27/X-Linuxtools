@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, xdora
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.8"
+VERSION="0.6.9"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -29,6 +29,11 @@ SERVER_UPDATER_LOCAL_NAME="Server-Updater.sh"
 
 DOCKER_INSTALL_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Docker-Install.sh"
 DOCKER_INSTALL_LOCAL_NAME="Docker-Install.sh"
+
+# --- XDora repo ---
+XDORA_REPO_URL="https://github.com/GamerX27/XDora"
+XDORA_DIR_NAME="XDora"
+XDORA_SETUP_SCRIPT="Setup-XDora-OS.sh"
 
 # --- Safe clear (works in minimal shells) ---
 safe_clear() {
@@ -266,9 +271,46 @@ x27_docker_install() {
   inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"; run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"; ok "Docker install routine finished (log out/in may be required for group changes)."
 }
 
+# ------------------------------ XDora section -------------------------------
+x27_xdora() {
+  echo; inf "XDora — A Fedora-Based kinda Based Distro"
+  msg " - Provides the stock KDE desktop with minimal apps"
+  msg " - Enables RPM Fusion repositories"
+  msg " - Mostly not Fedora branded"
+  msg " - This will: git clone $XDORA_REPO_URL, cd $XDORA_DIR_NAME, and run sudo bash $XDORA_SETUP_SCRIPT"
+
+  # Extra heads-up if not on Fedora/RHEL family
+  if source /etc/os-release 2>/dev/null; then
+    if [[ ${ID_LIKE:-}${ID:-} != *"fedora"* && ${ID_LIKE:-}${ID:-} != *"rhel"* ]]; then
+      warn "Your detected base isn't Fedora/RHEL-like. XDora is intended for Fedora-based systems."
+      confirm "Continue anyway?" || { warn "Canceled."; return 0; }
+    fi
+  fi
+
+  confirm "Proceed with XDora setup?" || { warn "Canceled."; return 0; }
+
+  have git || { err "git is required but not found"; return 1; }
+
+  if [[ -d "$XDORA_DIR_NAME/.git" ]]; then
+    inf "Repo exists → $XDORA_DIR_NAME (pulling latest)"
+    (cd "$XDORA_DIR_NAME" && run git pull --ff-only)
+  else
+    inf "Cloning → $XDORA_DIR_NAME"
+    run git clone --depth 1 "$XDORA_REPO_URL" "$XDORA_DIR_NAME"
+  fi
+
+  if [[ ! -f "$XDORA_DIR_NAME/$XDORA_SETUP_SCRIPT" ]]; then
+    err "Setup script not found: $XDORA_DIR_NAME/$XDORA_SETUP_SCRIPT"; return 1
+  fi
+
+  inf "Executing: sudo bash $XDORA_SETUP_SCRIPT"
+  (cd "$XDORA_DIR_NAME" && run sudo_maybe bash "$XDORA_SETUP_SCRIPT")
+  ok "XDora setup routine finished."
+}
+
 # ============================ Registration ===================================
 declare -a ACTIONS=(
-  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install"
+  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" "xdora"
 )
 
 declare -a DESCRIPTIONS=(
@@ -280,6 +322,7 @@ declare -a DESCRIPTIONS=(
   "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
   "Deploy Server Updater: Universal updater + cron (optional auto-reboot)."
   "Docker install: Engine+plugins, docker group, optional Portainer."
+  "XDora — Fedora-based, stock KDE with minimal apps, RPM Fusion; mostly not Fedora branded. Clone & run setup."
 )
 
 list_actions() { local i; for (( i=0; i<${#ACTIONS[@]}; i++ )); do printf "  %-22s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"; done; }
@@ -295,6 +338,7 @@ run_action() {
     virtualization_setup) x27_virtualization_setup "$@";;
     server_updater)       x27_server_updater "$@";;
     docker_install)       x27_docker_install "$@";;
+    xdora)                x27_xdora "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
