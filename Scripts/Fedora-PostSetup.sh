@@ -9,6 +9,8 @@ sudo dnf -y install \
 
 sudo dnf -y update @core
 
+curl -fsS https://dl.brave.com/install.sh | sh
+
 sudo dnf -y swap ffmpeg-free ffmpeg --allowerasing
 
 sudo dnf -y update @multimedia \
