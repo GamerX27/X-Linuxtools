@@ -69,27 +69,17 @@ case "${answer,,}" in
     ;;
 esac
 
-# --- Disable Fedora connectivity check (the ping/probe to fedoraproject.org) ---
+echo "[INFO] Disabling NetworkManager connectivity check..."
+sudo mv /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
+        /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.xyz
 
-# Backup the vendor config if it exists
-if [ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
-  sudo cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
-            /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
-fi
+echo "[INFO] Reloading NetworkManager..."
+sudo systemctl reload NetworkManager
 
-# Remove any existing override in /etc
-if [ -f /etc/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
-  sudo mv /etc/NetworkManager/conf.d/20-connectivity-fedora.conf \
-          /etc/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
-fi
+echo "[INFO] Restarting NetworkManager..."
+sudo systemctl restart NetworkManager
 
-# Create a new override file with no URI
-sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
-[connectivity]
-uri=
-EOF
+echo "[DONE] Connectivity check disabled (renamed with .xyz)."
 
-# Reload NetworkManager to apply the config (fall back to restart)
-sudo systemctl reload NetworkManager 2>/dev/null || sudo systemctl restart NetworkManager 2>/dev/null
 
 echo "=== Setup complete ✅ ==="
