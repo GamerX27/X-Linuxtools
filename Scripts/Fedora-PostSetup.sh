@@ -1,5 +1,5 @@
 #!/bin/bash
-#Based on my XDora Project
+# Based on my XDora Project
 
 set -euo pipefail
 
@@ -49,7 +49,7 @@ esac
 
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-sudo dnf remove libreoffice\* dragon juk elisa-player kmail -y
+sudo dnf remove -y libreoffice\* dragon juk elisa-player kmail
 
 sudo dnf -y install fish papirus-icon-theme vlc fastfetch
 
@@ -68,17 +68,25 @@ case "${answer,,}" in
     echo "Skipping extras."
     ;;
 esac
-# Disable Fedora connectivity check (the ping to fedoraproject.org)
+
+# --- Disable Fedora connectivity check (the ping/probe to fedoraproject.org) ---
+
+# Backup the vendor config if it exists (needs sudo for /usr/lib)
 if [ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
-  cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
-        /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
+  sudo cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
+            /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
 fi
 
-cat > /etc/NetworkManager/conf.d/20-connectivity-fedora.conf <<'EOF'
+# Place an override in /etc (takes precedence over /usr/lib)
+sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
 [connectivity]
+# Empty URI disables the periodic connectivity check
 uri=
+# Alternatively, you can explicitly turn it off like this on newer NM:
+# enabled=false
 EOF
 
-systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager 2>/dev/null
+# Reload NetworkManager to apply the config (fall back to restart)
+sudo systemctl reload NetworkManager 2>/dev/null || sudo systemctl restart NetworkManager 2>/dev/null
 
 echo "=== Setup complete ✅ ==="
