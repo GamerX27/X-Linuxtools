@@ -68,8 +68,17 @@ case "${answer,,}" in
     echo "Skipping extras."
     ;;
 esac
+# Disable Fedora connectivity check (the ping to fedoraproject.org)
+if [ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
+  cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
+        /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
+fi
 
-sudo sh -c '[ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ] && cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s) ; printf "[connectivity]\nuri=\n" > /etc/NetworkManager/conf.d/20-connectivity-fedora.conf && systemctl reload NetworkManager || systemctl restart NetworkManager'
+cat > /etc/NetworkManager/conf.d/20-connectivity-fedora.conf <<'EOF'
+[connectivity]
+uri=
+EOF
 
+systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager 2>/dev/null
 
 echo "=== Setup complete ✅ ==="
