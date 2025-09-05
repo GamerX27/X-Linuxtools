@@ -1,4 +1,6 @@
 #!/bin/bash
+#Based on my XDora Project
+
 set -euo pipefail
 
 sudo dnf -y update
@@ -66,5 +68,8 @@ case "${answer,,}" in
     echo "Skipping extras."
     ;;
 esac
+
+sudo sh -c '[ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ] && cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s) ; printf "[connectivity]\nuri=\n" > /etc/NetworkManager/conf.d/20-connectivity-fedora.conf && systemctl reload NetworkManager || systemctl restart NetworkManager'
+
 
 echo "=== Setup complete ✅ ==="
