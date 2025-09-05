@@ -71,19 +71,22 @@ esac
 
 # --- Disable Fedora connectivity check (the ping/probe to fedoraproject.org) ---
 
-# Backup the vendor config if it exists (needs sudo for /usr/lib)
+# Backup the vendor config if it exists
 if [ -f /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
   sudo cp -a /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf \
             /usr/lib/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
 fi
 
-# Place an override in /etc (takes precedence over /usr/lib)
+# Remove any existing override in /etc
+if [ -f /etc/NetworkManager/conf.d/20-connectivity-fedora.conf ]; then
+  sudo mv /etc/NetworkManager/conf.d/20-connectivity-fedora.conf \
+          /etc/NetworkManager/conf.d/20-connectivity-fedora.conf.bak.$(date +%s)
+fi
+
+# Create a new override file with no URI
 sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
 [connectivity]
-# Empty URI disables the periodic connectivity check
 uri=
-# Alternatively, you can explicitly turn it off like this on newer NM:
-# enabled=false
 EOF
 
 # Reload NetworkManager to apply the config (fall back to restart)
