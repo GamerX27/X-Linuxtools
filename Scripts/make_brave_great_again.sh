@@ -27,7 +27,12 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "SpellcheckUseSpellingService": false,
   "UrlKeyedAnonymizedDataCollectionEnabled": false,
   "DefaultBrowserSettingEnabled": false,
-  "PromosEnabled": false
+  "PromosEnabled": false,
+
+  "PasswordManagerEnabled": false,
+  "CredentialProviderEnabled": false,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false
 }
 JSON
 
