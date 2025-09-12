@@ -44,7 +44,17 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultGeolocationSetting": 2,
   "DefaultCameraSetting": 2,
   "DefaultMicrophoneSetting": 2,
-  "DefaultNotificationsSetting": 2
+  "DefaultNotificationsSetting": 2,
+
+  "WebRtcLocalIpsAllowedUrls": [],
+  "WebRtcEventLogCollectionAllowed": false,
+
+  "BraveNewsOptIn": false,
+  "NewTabPageSearchBoxEnabled": false,
+  "NewTabPageTopSitesEnabled": false,
+  "BraveTalkEnabled": false,
+  "BraveSponsoredImagesDisabled": true,
+  "BraveNewTabPageSponsoredSitesEnabled": false
 }
 JSON
 
