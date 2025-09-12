@@ -14,6 +14,7 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
 {
   "BraveAIChatEnabled": false,
   "BraveWalletDisabled": true,
+  "BraveCryptoWalletsEnabled": false,
   "IPFSDisabled": true,
   "TorDisabled": true,
 
@@ -43,11 +44,7 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultGeolocationSetting": 2,
   "DefaultCameraSetting": 2,
   "DefaultMicrophoneSetting": 2,
-  "DefaultNotificationsSetting": 2,
-
-  "BraveNewsDisabled": true,
-  "BraveTalkDisabled": true,
-  "BraveSponsoredImagesDisabled": true
+  "DefaultNotificationsSetting": 2
 }
 JSON
 
