@@ -33,7 +33,7 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "CredentialProviderEnabled": false,
   "AutofillAddressEnabled": false,
   "AutofillCreditCardEnabled": false,
-  "BraveRewardsDisabled": false
+  "BraveRewardsDisabled": true
 }
 JSON
 
