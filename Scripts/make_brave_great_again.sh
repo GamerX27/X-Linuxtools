@@ -46,15 +46,15 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultMicrophoneSetting": 2,
   "DefaultNotificationsSetting": 2,
 
-  "WebRtcLocalIpsAllowedUrls": [],
-  "WebRtcEventLogCollectionAllowed": false,
-
   "BraveNewsOptIn": false,
   "NewTabPageSearchBoxEnabled": false,
   "NewTabPageTopSitesEnabled": false,
   "BraveTalkEnabled": false,
   "BraveSponsoredImagesDisabled": true,
-  "BraveNewTabPageSponsoredSitesEnabled": false
+  "BraveNewTabPageSponsoredSitesEnabled": false,
+
+  "WebRtcIPHandlingPolicy": "disable_non_proxied_udp",
+  "WebRtcEventLogCollectionAllowed": false
 }
 JSON
 
