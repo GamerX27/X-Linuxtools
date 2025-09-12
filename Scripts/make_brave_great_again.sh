@@ -33,7 +33,13 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "CredentialProviderEnabled": false,
   "AutofillAddressEnabled": false,
   "AutofillCreditCardEnabled": false,
-  "BraveRewardsDisabled": true
+  "BraveRewardsDisabled": true,
+
+  "DefaultSearchProviderEnabled": true,
+  "DefaultSearchProviderName": "Qwant",
+  "DefaultSearchProviderSearchURL": "https://www.qwant.com/?q={searchTerms}",
+  "DefaultSearchProviderSuggestURL": "https://api.qwant.com/api/suggest/?q={searchTerms}",
+  "DefaultSearchProviderKeyword": "qwant"
 }
 JSON
 
