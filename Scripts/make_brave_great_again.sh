@@ -39,7 +39,12 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultSearchProviderName": "Qwant",
   "DefaultSearchProviderSearchURL": "https://www.qwant.com/?q={searchTerms}",
   "DefaultSearchProviderSuggestURL": "https://api.qwant.com/api/suggest/?q={searchTerms}",
-  "DefaultSearchProviderKeyword": "qwant"
+  "DefaultSearchProviderKeyword": "qwant",
+
+  "DefaultGeolocationSetting": 2,
+  "DefaultCameraSetting": 2,
+  "DefaultMicrophoneSetting": 2,
+  "DefaultNotificationsSetting": 2
 }
 JSON
 
