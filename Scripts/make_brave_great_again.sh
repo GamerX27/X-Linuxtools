@@ -39,7 +39,12 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
 
   "BraveVPNDisabled": true,
   "BraveNewsDisabled": true,
-  "BraveTalkDisabled": true
+  "BraveTalkDisabled": true,
+
+  "DefaultGeolocationSetting": 2,
+  "DefaultNotificationsSetting": 2,
+  "VideoCaptureAllowed": false,
+  "AudioCaptureAllowed": false
 }
 JSON
 
