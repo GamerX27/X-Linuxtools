@@ -2,7 +2,7 @@
 # X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader,
 #        virtualization_setup, server_updater, docker_install,
 #        fedora_postsetup, brave_debloat
-# Clean banner menu • logs deleted after each run
+# Clean banner menu • logs deleted after each run • logs in ./logs
 
 # ---------------- Strict mode ----------------
 set -Eeuo pipefail
@@ -11,7 +11,30 @@ IFS=$' \t\n'
 # ---------------- Metadata ----------------
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.7.2"
+VERSION="0.8.0"
+
+# ---------------- External script URLs ----------------
+DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
+DEBIAN_POST_LOCAL_NAME="Debian-Post-Installer.sh"
+DEBIAN_POST_LOCAL_FALLBACK="/Scripts/Debian-Post-Installer.sh"
+
+YTDL_PY_URL="https://raw.githubusercontent.com/GamerX27/YT-Downloader-Script/refs/heads/main/YT-Downloader-Cli.py"
+
+VIRT_LOCAL_FALLBACK="/Scripts/Virtualization_Setup.sh"
+VIRT_LOCAL_NAME="Virtualization_Setup.sh"
+VIRT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Virtualization_Setup.sh"
+
+SERVER_UPDATER_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Server-Updater.sh"
+SERVER_UPDATER_LOCAL_NAME="Server-Updater.sh"
+
+DOCKER_INSTALL_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Docker-Install.sh"
+DOCKER_INSTALL_LOCAL_NAME="Docker-Install.sh"
+
+FEDORA_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Fedora-PostSetup.sh"
+FEDORA_POST_LOCAL_NAME="Fedora-PostSetup.sh"
+
+BRAVE_DEBLOAT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/make_brave_great_again.sh"
+BRAVE_DEBLOAT_LOCAL_NAME="make_brave_great_again.sh"
 
 # ---------------- Colors ----------------
 if [[ -t 1 ]]; then
@@ -43,10 +66,7 @@ sudo_maybe() {
   else "$@"; fi
 }
 
-run() {
-  log "RUN: $*"
-  "$@"
-}
+run() { log "RUN: $*"; "$@"; }
 
 confirm() {
   local prompt="${1:-Are you sure?}" ans
@@ -70,7 +90,7 @@ install_with_mgr() {
     apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y install "$@" ;;
     dnf)    run sudo_maybe dnf -y install "$@" ;;
     yum)    run sudo_maybe yum -y install "$@" ;;
-    pacman) run sudo_maybe pacman -Sy --noconfirm "$@" ;;
+    pacman) run sudo_maybe pac-get() { :; }; run sudo_maybe pacman -Sy --noconfirm "$@" ;;
     zypper) run sudo_maybe zypper --non-interactive in "$@" ;;
     *)      return 1 ;;
   esac
@@ -91,53 +111,57 @@ base_deps_check_install() {
 
 # ---------------- Dependency helpers ----------------
 ensure_wget() { have wget && return 0 || { warn "wget not found. Installing…"; base_deps_check_install; }; }
+
 ensure_python3() {
   have python3 && return 0
   warn "python3 not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
   case "$mgr" in
-    apt) run sudo_maybe apt-get update; run sudo_maybe apt-get -y install python3 ;;
-    dnf) run sudo_maybe dnf -y install python3 ;;
-    yum) run sudo_maybe yum -y install python3 ;;
+    apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y install python3 ;;
+    dnf)    run sudo_maybe dnf -y install python3 ;;
+    yum)    run sudo_maybe yum -y install python3 ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm python ;;
     zypper) run sudo_maybe zypper --non-interactive in python3 ;;
-    *) err "Unknown package manager"; return 1 ;;
+    *)      err "Unknown package manager"; return 1 ;;
   esac
 }
+
 ensure_pip3() {
   have pip3 && return 0
   warn "pip3 not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
   case "$mgr" in
-    apt) run sudo_maybe apt-get -y install python3-pip ;;
-    dnf) run sudo_maybe dnf -y install python3-pip ;;
-    yum) run sudo_maybe yum -y install python3-pip ;;
+    apt)    run sudo_maybe apt-get -y install python3-pip ;;
+    dnf)    run sudo_maybe dnf -y install python3-pip ;;
+    yum)    run sudo_maybe yum -y install python3-pip ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm python-pip ;;
     zypper) run sudo_maybe zypper --non-interactive in python3-pip ;;
-    *) err "Unknown package manager"; return 1 ;;
+    *)      err "Unknown package manager"; return 1 ;;
   esac
 }
+
 ensure_ffmpeg() {
   have ffmpeg && return 0
   warn "ffmpeg not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
   case "$mgr" in
-    apt) run sudo_maybe apt-get -y install ffmpeg ;;
-    dnf) run sudo_maybe dnf -y install ffmpeg ;;
-    yum) run sudo_maybe yum -y install ffmpeg || true ;;
+    apt)    run sudo_maybe apt-get -y install ffmpeg ;;
+    dnf)    run sudo_maybe dnf -y install ffmpeg ;;
+    yum)    run sudo_maybe yum -y install ffmpeg || true ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm ffmpeg ;;
     zypper) run sudo_maybe zypper --non-interactive in ffmpeg ;;
-    *) err "Unknown package manager"; return 1 ;;
+    *)      err "Unknown package manager"; return 1 ;;
   esac
 }
+
 ensure_ytdlp() {
   have yt-dlp && return 0
   warn "yt-dlp not found. Attempting distro install…"
   local mgr ok=false; mgr=$(detect_pkg) || true
   case "$mgr" in
-    apt) run sudo_maybe apt-get -y install yt-dlp && ok=true ;;
-    dnf) run sudo_maybe dnf -y install yt-dlp && ok=true ;;
-    yum) run sudo_maybe yum -y install yt-dlp && ok=true || true ;;
+    apt)    run sudo_maybe apt-get -y install yt-dlp && ok=true ;;
+    dnf)    run sudo_maybe dnf -y install yt-dlp && ok=true ;;
+    yum)    run sudo_maybe yum -y install yt-dlp && ok=true || true ;;
     pacman) run sudo_maybe pacman -Sy --noconfirm yt-dlp && ok=true ;;
     zypper) run sudo_maybe zypper --non-interactive in yt-dlp && ok=true || true ;;
   esac
@@ -149,37 +173,200 @@ ensure_ytdlp() {
     have yt-dlp || { err "yt-dlp still not found; add ~/.local/bin to PATH"; return 1; }
   fi
 }
+
 ensure_yt_deps() { ensure_wget && ensure_python3 && ensure_ffmpeg && ensure_ytdlp; }
 
 # ---------------- Actions ----------------
-# (your existing x27_sysinfo, x27_update, x27_cleanup, etc go here unchanged)
-
-# ---------------- Registration ----------------
-declare -a ACTIONS=(
-  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader"
-  "virtualization_setup" "server_updater" "docker_install" "fedora_postsetup" "brave_debloat"
-)
-
-declare -a DESCRIPTIONS=(
-  "Show basic system info (CPU/mem/disk)."
-  "Update system packages (with confirmation)."
-  "Clean caches/logs safely (with confirmation)."
-  "Debian Desktop Setup (CLI → KDE)."
-  "YT Downloader: local script; installs deps if missing."
-  "Virtualization: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
-  "Deploy Server Updater: universal updater + optional cron."
-  "Docker: Engine + plugins, docker group, optional Portainer."
-  "Fedora Post-Setup: download and run Fedora-PostSetup.sh."
-  "Brave Debloat: download and run privacy/bloat tweaks."
-)
-
-list_actions() {
-  local i
-  for (( i=0; i<${#ACTIONS[@]}; i++ )); do
-    printf "  %-22s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
-  done
+x27_sysinfo() {
+  inf "Host: $(hostname)"; inf "User: $USER"
+  inf "Kernel: $(uname -srmo 2>/dev/null || uname -sr)"
+  inf "Uptime: $(uptime -p || true)"
+  if source /etc/os-release 2>/dev/null; then inf "Distro: ${NAME:-Unknown} ${VERSION:-}"; else inf "Distro: Unknown"; fi
+  echo; inf "CPU:";   lscpu 2>/dev/null | sed -n '1,8p' || true
+  echo; inf "Memory:"; free -h || true
+  echo; inf "Disk:";  df -hT --total | sed -n '1,10p' || true
 }
 
+x27_update() {
+  local mgr; mgr=$(detect_pkg) || { err "No supported package manager."; return 1; }
+  warn "This will update system packages using: $mgr"
+  confirm "Proceed with system update?" || { warn "Canceled."; return 0; }
+  case "$mgr" in
+    apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y upgrade; run sudo_maybe apt-get -y autoremove ;;
+    dnf)    run sudo_maybe dnf -y upgrade ;;
+    yum)    run sudo_maybe yum -y update ;;
+    pacman) run sudo_maybe pacman -Syu --noconfirm ;;
+    zypper) run sudo_maybe zypper refresh; run sudo_maybe zypper update -y ;;
+    *)      err "Unsupported package manager: $mgr"; return 1 ;;
+  esac
+  ok "System update complete."
+}
+
+x27_cleanup() {
+  inf "Cleaning package caches and old logs where possible."
+  confirm "Proceed with cleanup?" || { warn "Canceled."; return 0; }
+  local mgr; mgr=$(detect_pkg) || true
+  case "$mgr" in
+    apt)     run sudo_maybe apt-get -y autoremove; run sudo_maybe apt-get -y autoclean ;;
+    dnf|yum) run sudo_maybe "$mgr" clean all -y ;;
+    pacman)  run sudo_maybe paccache -r -k2 2>/dev/null || true ;;
+    zypper)  run sudo_maybe zypper clean -a ;;
+  esac
+  if have journalctl && confirm "Vacuum systemd journal to 200M?"; then run sudo_maybe journalctl --vacuum-size=200M; fi
+  ok "Cleanup done."
+}
+
+x27_debian_desktop_setup() {
+  echo; inf "Debian Desktop Setup (CLI → KDE)"
+  msg " - KDE Standard, Flatpak + Discover, fish/fastfetch/VLC, Flathub, cleanup, reboot"
+  warn "Debian-focused. This will change desktop packages and may reboot."
+  confirm "Run the Debian Desktop Setup now?" || { warn "Canceled."; return 0; }
+  local runner=""
+  if [[ -f "$DEBIAN_POST_LOCAL_FALLBACK" ]]; then
+    inf "Found local: $DEBIAN_POST_LOCAL_FALLBACK"; runner="$DEBIAN_POST_LOCAL_FALLBACK"
+  else
+    ensure_wget || return 1
+    inf "Downloading → ./$DEBIAN_POST_LOCAL_NAME"
+    run bash -c "wget -qO '$DEBIAN_POST_LOCAL_NAME' '$DEBIAN_POST_URL'"
+    run chmod +x "$DEBIAN_POST_LOCAL_NAME"
+    runner="./$DEBIAN_POST_LOCAL_NAME"
+  fi
+  inf "Executing: $runner"
+  run sudo_maybe bash "$runner"
+  ok "Debian Desktop Setup complete (system may reboot)."
+}
+
+x27_yt_downloader() {
+  echo; inf "YT Downloader (local script)"
+  msg " - yt-dlp + ffmpeg; downloads to ./YT-Downloads"
+  local fname="YT-Downloader-Cli.py"
+  if have yt-dlp; then
+    ok "yt-dlp detected"
+    have python3 || { err "python3 missing"; return 1; }
+    [[ -f "$fname" ]] || { ensure_wget || return 1; inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
+    inf "Launching: python3 $fname"
+    run python3 "$fname" || true
+    ok "Done. Files → ./YT-Downloads"
+    return 0
+  fi
+  warn "yt-dlp not found. Installing prerequisites…"
+  ensure_yt_deps || return 1
+  [[ -f "$fname" ]] || { inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
+  inf "Launching: python3 $fname"
+  run python3 "$fname" || true
+  ok "Done. Files → ./YT-Downloads"
+}
+
+x27_virtualization_setup() {
+  echo; inf "Virtualization Setup (KVM/QEMU + virt-manager)"
+  msg " - Installs QEMU/KVM, libvirt, virt-manager; enables libvirtd; NAT; group access"
+  confirm "Proceed with Virtualization Setup?" || { warn "Canceled."; return 0; }
+  local runner=""
+  if [[ -f "$VIRT_LOCAL_FALLBACK" ]]; then
+    inf "Found local: $VIRT_LOCAL_FALLBACK"; runner="$VIRT_LOCAL_FALLBACK"
+  else
+    ensure_wget || return 1
+    inf "Downloading → ./$VIRT_LOCAL_NAME"
+    run bash -c "wget -qO '$VIRT_LOCAL_NAME' '$VIRT_URL'"
+    run chmod +x "$VIRT_LOCAL_NAME"
+    runner="./$VIRT_LOCAL_NAME"
+  fi
+  inf "Executing: $runner"
+  run sudo_maybe bash "$runner"
+  ok "Virtualization ready. Try: virt-manager"
+}
+
+x27_server_updater() {
+  echo; inf "Deploy Server Updater"
+  msg " - Universal updater (update-system) + optional cron (auto-reboot)"
+  confirm "Proceed with Server Updater setup?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$SERVER_UPDATER_LOCAL_NAME"
+  run bash -c "wget -qO '$SERVER_UPDATER_LOCAL_NAME' '$SERVER_UPDATER_URL'"
+  run chmod +x "$SERVER_UPDATER_LOCAL_NAME"
+  inf "Executing: sudo bash $SERVER_UPDATER_LOCAL_NAME"
+  run sudo_maybe bash "$SERVER_UPDATER_LOCAL_NAME"
+  ok "Server Updater deployed."
+}
+
+x27_docker_install() {
+  echo; inf "Docker Install"
+  msg " - Detects Debian/RHEL; installs Docker Engine + plugins; adds user to docker group; optional Portainer"
+  confirm "Proceed with Docker Install?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$DOCKER_INSTALL_LOCAL_NAME"
+  run bash -c "wget -qO '$DOCKER_INSTALL_LOCAL_NAME' '$DOCKER_INSTALL_URL'"
+  run chmod +x "$DOCKER_INSTALL_LOCAL_NAME"
+  inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"
+  run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"
+  ok "Docker install finished (log out/in may be required for group changes)."
+}
+
+x27_fedora_postsetup() {
+  echo; inf "Fedora Post-Setup"
+  msg " - RPM Fusion, codecs, KDE bits, etc."
+  if source /etc/os-release 2>/dev/null; then
+    local base="${ID_LIKE:-}${ID:-}"
+    if [[ "$base" != *"fedora"* && "$base" != *"rhel"* ]]; then
+      warn "Detected non-Fedora/RHEL base. This script targets Fedora."
+      confirm "Continue anyway?" || { warn "Canceled."; return 0; }
+    fi
+  fi
+  confirm "Proceed with Fedora Post-Setup?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$FEDORA_POST_LOCAL_NAME"
+  run bash -c "wget -qO '$FEDORA_POST_LOCAL_NAME' '$FEDORA_POST_URL'"
+  [[ -s "$FEDORA_POST_LOCAL_NAME" ]] || { err "Download failed or empty file: $FEDORA_POST_LOCAL_NAME"; return 1; }
+  run chmod +x "$FEDORA_POST_LOCAL_NAME"
+  inf "Executing: sudo bash $FEDORA_POST_LOCAL_NAME"
+  run sudo_maybe bash "$FEDORA_POST_LOCAL_NAME"
+  ok "Fedora Post-Setup complete."
+}
+
+x27_brave_debloat() {
+  echo; inf "Make Brave Great Again"
+  msg " - Debloats Brave browser (privacy-focused tweaks)."
+  confirm "Proceed with Brave debloat script?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$BRAVE_DEBLOAT_LOCAL_NAME"
+  run bash -c "wget -qO '$BRAVE_DEBLOAT_LOCAL_NAME' '$BRAVE_DEBLOAT_URL'"
+  [[ -s "$BRAVE_DEBLOAT_LOCAL_NAME" ]] || { err "Download failed or empty file: $BRAVE_DEBLOAT_LOCAL_NAME"; return 1; }
+  run chmod +x "$BRAVE_DEBLOAT_LOCAL_NAME"
+  inf "Executing: sudo bash $BRAVE_DEBLOAT_LOCAL_NAME"
+  run sudo_maybe bash "$BRAVE_DEBLOAT_LOCAL_NAME"
+  ok "Brave debloat complete."
+}
+
+# ---------------- Categorized registry ----------------
+# Category IDs
+declare -a CATEGORY_IDS=("desktop" "system" "servers")
+# Category display titles
+declare -A CATEGORY_TITLES=(
+  [desktop]="Linux Desktop"
+  [system]="System"
+  [servers]="Servers & Dev"
+)
+
+# Actions per category
+declare -a ACTIONS_desktop=( "debian_desktop_setup" "virtualization_setup" "fedora_postsetup" "brave_debloat" )
+declare -a ACTIONS_system=( "sysinfo" "update" "cleanup" "yt_downloader" )
+declare -a ACTIONS_servers=( "docker_install" "server_updater" )
+
+# Descriptions
+declare -A DESCRIPTIONS=(
+  [sysinfo]="Show basic system info (CPU/mem/disk)."
+  [update]="Update system packages (with confirmation)."
+  [cleanup]="Clean caches/logs safely (with confirmation)."
+  [debian_desktop_setup]="Debian Desktop Setup (CLI → KDE)."
+  [yt_downloader]="YT Downloader: local script; installs deps if missing."
+  [virtualization_setup]="Virtualization: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
+  [server_updater]="Deploy Server Updater: universal updater + optional cron."
+  [docker_install]="Docker: Engine + plugins, docker group, optional Portainer."
+  [fedora_postsetup]="Fedora Post-Setup: download and run Fedora-PostSetup.sh."
+  [brave_debloat]="Brave Debloat: privacy/bloat tweaks."
+)
+
+# Case dispatcher
 run_action() {
   local name="${1:-}"; shift || true
   case "$name" in
@@ -197,6 +384,28 @@ run_action() {
   esac
 }
 
+print_actions_by_category() {
+  local -a MENU_ACTIONS=()
+  local idx=1 cat id act desc
+
+  for id in "${CATEGORY_IDS[@]}"; do
+    local title="${CATEGORY_TITLES[$id]}"
+    local -n arr="ACTIONS_${id}"
+
+    printf "%s┌─ %s%s%s ───────────────────────────┐%s\n" "$CYA" "$BOLD" "$title" "$RST" "$RST"
+    for act in "${arr[@]}"; do
+      desc="${DESCRIPTIONS[$act]}"
+      printf " %2d) %-22s %s\n" "$idx" "$act" "$desc"
+      MENU_ACTIONS+=("$act")
+      ((idx++))
+    done
+    printf "└──────────────────────────────────────────┘%s\n\n" "$RST"
+  done
+
+  # Export the flattened action list for selection handler
+  export MENU_ACTIONS_STR="${MENU_ACTIONS[*]}"
+}
+
 usage() {
   printf "%s%s%s v%s\n" "$BOLD" "$APP_NAME" "$RST" "$VERSION"
   echo "Minimal toolbox. Logs are deleted after each run."
@@ -205,20 +414,19 @@ usage() {
   echo "  $APP_CMD                 # interactive menu"
   echo "  $APP_CMD <action>        # run a specific tool"
   echo
-  echo "Actions:"
-  list_actions
+  print_actions_by_category
 }
 
 menu() {
   safe_clear
-  echo "${CYA}============================================${RST}"
-  echo "${BOLD}${APP_NAME}${RST} ${DIM}- Your Linux Utility Toolbox${RST}"
-  echo "${CYA}============================================${RST}"
-  echo
-  local i
-  for (( i=0; i<${#ACTIONS[@]}; i++ )); do
-    printf "%2d) %-22s %s\n" "$((i+1))" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"
-  done
+  printf "%s══════════════════════════════════════════════%s\n" "$CYA" "$RST"
+  printf "%s%s%s %s- Your Linux Utility Toolbox%s\n" "$BOLD" "$APP_NAME" "$RST" "$DIM" "$RST"
+  printf "%s══════════════════════════════════════════════%s\n\n" "$CYA" "$RST"
+
+  print_actions_by_category
+  # Reconstruct MENU_ACTIONS array from exported string
+  IFS=' ' read -r -a MENU_ACTIONS <<<"$MENU_ACTIONS_STR"
+
   echo " q) quit"
   echo
   while true; do
@@ -227,8 +435,8 @@ menu() {
       q|Q) exit 0 ;;
       '' ) continue ;;
       *  )
-        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice>=1 && choice<=${#ACTIONS[@]} )); then
-          local action="${ACTIONS[$((choice-1))]}"
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice>=1 && choice<=${#MENU_ACTIONS[@]} )); then
+          local action="${MENU_ACTIONS[$((choice-1))]}"
           echo; inf "Running: $action"
           run_action "$action"
           echo
