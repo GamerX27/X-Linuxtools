@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, fedora_postsetup, brave_privacy_policy
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.8"
+VERSION="0.6.11"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -29,6 +29,9 @@ SERVER_UPDATER_LOCAL_NAME="Server-Updater.sh"
 
 DOCKER_INSTALL_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Docker-Install.sh"
 DOCKER_INSTALL_LOCAL_NAME="Docker-Install.sh"
+
+FEDORA_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Fedora-PostSetup.sh"
+FEDORA_POST_LOCAL_NAME="Fedora-PostSetup.sh"
 
 # --- Safe clear (works in minimal shells) ---
 safe_clear() {
@@ -108,10 +111,8 @@ base_deps_check_install() {
 
   mgr=$(detect_pkg) || { err "Unsupported package manager. Please install: ${missing[*]}"; return 1; }
 
-  # Decide whether to prefix with sudo
   if [[ $EUID -ne 0 ]]; then
     if have sudo; then USE_SUDO="sudo"; else
-      # sudo is missing and we're not root
       err "'sudo' is missing and you are not root. Re-run as root (e.g., 'su -' then run script) or install sudo manually."; return 1
     fi
   else
@@ -266,9 +267,76 @@ x27_docker_install() {
   inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"; run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"; ok "Docker install routine finished (log out/in may be required for group changes)."
 }
 
+x27_fedora_postsetup() {
+  echo; inf "Fedora Postsetup"
+  msg " - Downloads and runs Fedora-PostSetup.sh (RPM Fusion, codecs, KDE bits, etc)."
+
+  # Warn if not Fedora/RHEL-like
+  if source /etc/os-release 2>/dev/null; then
+    if [[ ${ID_LIKE:-}${ID:-} != *"fedora"* && ${ID_LIKE:-}${ID:-} != *"rhel"* ]]; then
+      warn "Detected non-Fedora/RHEL base. This script targets Fedora."
+      confirm "Continue anyway?" || { warn "Canceled."; return 0; }
+    fi
+  fi
+
+  confirm "Proceed with Fedora Postsetup?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  inf "Downloading → ./$FEDORA_POST_LOCAL_NAME"
+  run bash -c "wget -qO '$FEDORA_POST_LOCAL_NAME' '$FEDORA_POST_URL'"
+  [[ -s "$FEDORA_POST_LOCAL_NAME" ]] || { err "Download failed or empty file: $FEDORA_POST_LOCAL_NAME"; return 1; }
+  run chmod +x "$FEDORA_POST_LOCAL_NAME"
+  inf "Executing: sudo bash $FEDORA_POST_LOCAL_NAME"
+  run sudo_maybe bash "$FEDORA_POST_LOCAL_NAME"
+  ok "Fedora Postsetup complete."
+}
+
+# --- NEW: Brave policy action (self-contained; no wget) ---
+x27_brave_privacy_policy() {
+  echo; inf "Brave Policy Hardening"
+  msg " - Applies enterprise policy to make Brave bloatless and more private (system-wide)."
+
+  if ! command -v brave-browser >/dev/null 2>&1 && ! command -v brave >/dev/null 2>&1; then
+    warn "Brave not detected in PATH. Policy can still be applied for future installations."
+  fi
+
+  confirm "Proceed to apply Brave policy (requires sudo)?" || { warn "Canceled."; return 0; }
+
+  local policy_dir="/etc/opt/brave/policies/managed"
+  local policy_file="$policy_dir/brave_policy.json"
+
+  inf "Writing policy → $policy_file"
+  run sudo_maybe mkdir -p "$policy_dir"
+  run sudo_maybe bash -c "cat > '$policy_file' <<'JSON'
+{
+  \"BackgroundModeEnabled\": false,
+  \"DefaultBrowserSettingEnabled\": false,
+  \"AutofillAddressEnabled\": false,
+  \"AutofillCreditCardEnabled\": false,
+  \"SearchSuggestEnabled\": false,
+  \"SafeBrowsingEnabled\": false,
+  \"MetricsReportingEnabled\": false,
+  \"SpellcheckEnabled\": false,
+
+  \"BraveRewardsDisabled\": true,
+  \"BraveVPNDisabled\": true,
+  \"BraveWalletDisabled\": true,
+  \"BraveTalkDisabled\": true,
+  \"BraveAIChatDisabled\": true,
+  \"BraveNewsDisabled\": true,
+
+  \"BraveShieldsAdBlockMode\": 2,
+  \"BraveShieldsHttpsEverywhereEnabled\": true,
+  \"BraveShieldsBlockFingerprinting\": 2,
+  \"BraveShieldsBlockCookies\": 2
+}
+JSON"
+  run sudo_maybe chmod 0644 "$policy_file"
+  ok "Brave policy applied. Restart Brave to take effect."
+}
+
 # ============================ Registration ===================================
 declare -a ACTIONS=(
-  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install"
+  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" "fedora_postsetup" "brave_privacy_policy"
 )
 
 declare -a DESCRIPTIONS=(
@@ -280,6 +348,8 @@ declare -a DESCRIPTIONS=(
   "Virtualization Setup: KVM/QEMU, libvirt, virt-manager; enable libvirtd; NAT."
   "Deploy Server Updater: Universal updater + cron (optional auto-reboot)."
   "Docker install: Engine+plugins, docker group, optional Portainer."
+  "Fedora Postsetup: Download and run Fedora-PostSetup.sh."
+  "Brave Policy Hardening: Apply enterprise policies to make Brave bloatless and more private."
 )
 
 list_actions() { local i; for (( i=0; i<${#ACTIONS[@]}; i++ )); do printf "  %-22s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"; done; }
@@ -295,6 +365,8 @@ run_action() {
     virtualization_setup) x27_virtualization_setup "$@";;
     server_updater)       x27_server_updater "$@";;
     docker_install)       x27_docker_install "$@";;
+    fedora_postsetup)     x27_fedora_postsetup "$@";;
+    brave_privacy_policy) x27_brave_privacy_policy "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
