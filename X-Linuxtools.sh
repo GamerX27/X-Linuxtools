@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, fedora_postsetup, brave_privacy_policy
+# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, fedora_postsetup, brave_debloat
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
 
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.6.11"
+VERSION="0.6.10"
 
 LOG_DIR="${X27_LOG_DIR:-$HOME/.local/share/x27/logs}"
 CONF_DIR="${X27_CONF_DIR:-$HOME/.config/x27}"
@@ -290,53 +290,30 @@ x27_fedora_postsetup() {
   ok "Fedora Postsetup complete."
 }
 
-# --- NEW: Brave policy action (self-contained; no wget) ---
-x27_brave_privacy_policy() {
-  echo; inf "Brave Policy Hardening"
-  msg " - Applies enterprise policy to make Brave bloatless and more private (system-wide)."
+x27_brave_debloat() {
+  echo
+  inf "Make Brave Great Again"
+  msg " - Debloats Brave browser (better privacy, less bloat)."
 
-  if ! command -v brave-browser >/dev/null 2>&1 && ! command -v brave >/dev/null 2>&1; then
-    warn "Brave not detected in PATH. Policy can still be applied for future installations."
-  fi
+  confirm "Proceed with Brave debloat script?" || { warn "Canceled."; return 0; }
 
-  confirm "Proceed to apply Brave policy (requires sudo)?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  local script_name="make_brave_great_again.sh"
+  local script_url="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/make_brave_great_again.sh"
 
-  local policy_dir="/etc/opt/brave/policies/managed"
-  local policy_file="$policy_dir/brave_policy.json"
+  inf "Downloading → ./$script_name"
+  run bash -c "wget -qO '$script_name' '$script_url'"
+  [[ -s "$script_name" ]] || { err "Download failed or empty file: $script_name"; return 1; }
 
-  inf "Writing policy → $policy_file"
-  run sudo_maybe mkdir -p "$policy_dir"
-  run sudo_maybe bash -c "cat > '$policy_file' <<'JSON'
-{
-  \"BackgroundModeEnabled\": false,
-  \"DefaultBrowserSettingEnabled\": false,
-  \"AutofillAddressEnabled\": false,
-  \"AutofillCreditCardEnabled\": false,
-  \"SearchSuggestEnabled\": false,
-  \"SafeBrowsingEnabled\": false,
-  \"MetricsReportingEnabled\": false,
-  \"SpellcheckEnabled\": false,
-
-  \"BraveRewardsDisabled\": true,
-  \"BraveVPNDisabled\": true,
-  \"BraveWalletDisabled\": true,
-  \"BraveTalkDisabled\": true,
-  \"BraveAIChatDisabled\": true,
-  \"BraveNewsDisabled\": true,
-
-  \"BraveShieldsAdBlockMode\": 2,
-  \"BraveShieldsHttpsEverywhereEnabled\": true,
-  \"BraveShieldsBlockFingerprinting\": 2,
-  \"BraveShieldsBlockCookies\": 2
-}
-JSON"
-  run sudo_maybe chmod 0644 "$policy_file"
-  ok "Brave policy applied. Restart Brave to take effect."
+  run chmod +x "$script_name"
+  inf "Executing: sudo bash $script_name"
+  run sudo_maybe bash "$script_name"
+  ok "Brave debloat complete."
 }
 
 # ============================ Registration ===================================
 declare -a ACTIONS=(
-  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" "fedora_postsetup" "brave_privacy_policy"
+  "sysinfo" "update" "cleanup" "debian_desktop_setup" "yt_downloader" "virtualization_setup" "server_updater" "docker_install" "fedora_postsetup" "brave_debloat"
 )
 
 declare -a DESCRIPTIONS=(
@@ -349,7 +326,7 @@ declare -a DESCRIPTIONS=(
   "Deploy Server Updater: Universal updater + cron (optional auto-reboot)."
   "Docker install: Engine+plugins, docker group, optional Portainer."
   "Fedora Postsetup: Download and run Fedora-PostSetup.sh."
-  "Brave Policy Hardening: Apply enterprise policies to make Brave bloatless and more private."
+  "Brave Debloat: Download and run make_brave_great_again.sh (better privacy)."
 )
 
 list_actions() { local i; for (( i=0; i<${#ACTIONS[@]}; i++ )); do printf "  %-22s %s\n" "${ACTIONS[$i]}" "${DESCRIPTIONS[$i]}"; done; }
@@ -366,7 +343,7 @@ run_action() {
     server_updater)       x27_server_updater "$@";;
     docker_install)       x27_docker_install "$@";;
     fedora_postsetup)     x27_fedora_postsetup "$@";;
-    brave_privacy_policy) x27_brave_privacy_policy "$@";;
+    brave_debloat)        x27_brave_debloat "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
@@ -422,4 +399,4 @@ main() {
     esac
   done
 }
-main "$@"
+main "$@" 
