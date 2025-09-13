@@ -1,19 +1,29 @@
-Linux X-Toolbox
-========================================
+# Linux X-Toolbox
 
-BASH
-----
-Beta:
-  curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh | bash
+## BASH
 
-Stable:
-  curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh | bash
+**Beta**
+```bash
+curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh | bash
+```
 
+**Stable**
+```bash
+curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh | bash
+```
 
-FISH
-----
-Beta:
-  bash (curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh | psub)
+## FISH
 
-Stable:
-  bash (curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh | psub)
+**Beta**
+```fish
+bash (curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh | psub)
+```
+
+**Stable**
+```fish
+bash (curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh | psub)
+```
+
+---
+
+> Tip: If the installer needs root, add `sudo` before the final `bash`.
