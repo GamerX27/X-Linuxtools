@@ -4,12 +4,12 @@
 
 **Beta**
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh)
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X.Linuxtools-beta.sh)
 ```
 
 **Stable**
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh)
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtools/main/X-Linuxtools.sh)
 ```
 
 ## FISH
