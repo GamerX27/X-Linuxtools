@@ -11,7 +11,7 @@ IFS=$' \t\n'
 # ---------------- Metadata ----------------
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.8.1"
+VERSION="0.8.0"
 
 # ---------------- External script URLs ----------------
 DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
@@ -338,17 +338,21 @@ x27_brave_debloat() {
 }
 
 # ---------------- Categorized registry ----------------
+# Category IDs
 declare -a CATEGORY_IDS=("desktop" "system" "servers")
+# Category display titles
 declare -A CATEGORY_TITLES=(
   [desktop]="Linux Desktop"
   [system]="System"
   [servers]="Servers & Dev"
 )
 
+# Actions per category
 declare -a ACTIONS_desktop=( "debian_desktop_setup" "virtualization_setup" "fedora_postsetup" "brave_debloat" )
 declare -a ACTIONS_system=( "sysinfo" "update" "cleanup" "yt_downloader" )
 declare -a ACTIONS_servers=( "docker_install" "server_updater" )
 
+# Descriptions
 declare -A DESCRIPTIONS=(
   [sysinfo]="Show basic system info (CPU/mem/disk)."
   [update]="Update system packages (with confirmation)."
@@ -362,6 +366,7 @@ declare -A DESCRIPTIONS=(
   [brave_debloat]="Brave Debloat: privacy/bloat tweaks."
 )
 
+# Case dispatcher
 run_action() {
   local name="${1:-}"; shift || true
   case "$name" in
@@ -379,16 +384,12 @@ run_action() {
   esac
 }
 
-# Global array holding the flattened list for the menu
-MENU_ACTIONS=()
-
 print_actions_by_category() {
-  MENU_ACTIONS=()
-  local idx=1 id act desc
+  local -a MENU_ACTIONS=()
+  local idx=1 cat id act desc
 
   for id in "${CATEGORY_IDS[@]}"; do
     local title="${CATEGORY_TITLES[$id]}"
-    # nameref requires Bash 4.3+
     local -n arr="ACTIONS_${id}"
 
     printf "%s┌─ %s%s%s ───────────────────────────┐%s\n" "$CYA" "$BOLD" "$title" "$RST" "$RST"
@@ -400,6 +401,9 @@ print_actions_by_category() {
     done
     printf "└──────────────────────────────────────────┘%s\n\n" "$RST"
   done
+
+  # Export the flattened action list for selection handler
+  export MENU_ACTIONS_STR="${MENU_ACTIONS[*]}"
 }
 
 usage() {
@@ -420,6 +424,8 @@ menu() {
   printf "%s══════════════════════════════════════════════%s\n\n" "$CYA" "$RST"
 
   print_actions_by_category
+  # Reconstruct MENU_ACTIONS array from exported string
+  IFS=' ' read -r -a MENU_ACTIONS <<<"$MENU_ACTIONS_STR"
 
   echo " q) quit"
   echo
