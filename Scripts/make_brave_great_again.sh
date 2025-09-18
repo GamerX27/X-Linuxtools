@@ -2,7 +2,7 @@
 # make_brave_great_again.sh
 # Disable unwanted Brave features via managed policy
 # the name has nothing to do with politics even if it sounds like it...
-
+# It may say in the privacy settings the mic and camera are still on, but they are blocked from being accessed.
 set -e
 
 # ---- Detect Brave Flatpak & scope (system/user) ----
