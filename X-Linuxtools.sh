@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, fedora_postsetup, brave_debloat
+# sysinfo, update, cleanup, debian_desktop_setup, yt_downloader, virtualization_setup, server_updater, docker_install, fedora_postsetup, brave_debloat
 # Clean banner menu • logs deleted after each run
 
 set -Eeuo pipefail
