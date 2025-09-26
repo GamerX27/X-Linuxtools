@@ -36,7 +36,6 @@ FEDORA_POST_LOCAL_NAME="Fedora-PostSetup.sh"
 BRAVE_DEBLOAT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/make_brave_great_again.sh"
 BRAVE_DEBLOAT_LOCAL_NAME="make_brave_great_again.sh"
 
-# Gaming: Proton-CachyOS installer
 PROTON_CACHY_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/proton-cachyos-installer.sh"
 PROTON_CACHY_LOCAL_NAME="proton-cachyos-installer.sh"
 
