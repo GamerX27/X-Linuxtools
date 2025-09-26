@@ -11,7 +11,7 @@ IFS=$' \t\n'
 # ---------------- Metadata ----------------
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.8.0"
+VERSION="0.9.0"
 
 # ---------------- External script URLs ----------------
 DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
@@ -57,13 +57,24 @@ ok()   { printf "%s✔%s %s\n" "$GRN" "$RST" "$*"; }
 warn() { printf "%s!%s %s\n"  "$YLW" "$RST" "$*"; }
 err()  { printf "%s✖%s %s\n" "$RED" "$RST" "$*" >&2; }
 
-safe_clear() { if command -v clear >/dev/null 2>&1 && [[ -t 1 ]]; then clear; else printf "\n%.0s" {1..5}; fi; }
+safe_clear() { if command -v clear >/div/null 2>&1 && [[ -t 1 ]]; then clear; else printf "\n%.0s" {1..5}; fi; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 sudo_maybe() {
   if [[ $EUID -ne 0 ]]; then
     if have sudo; then sudo "$@"; else err "This action requires root and 'sudo' is not installed."; return 1; fi
   else "$@"; fi
+}
+
+# Prompt for sudo once per action, if desired by the action
+sudo_warmup() {
+  if [[ $EUID -ne 0 ]] && have sudo; then
+    sudo -v || { err "sudo authentication failed."; return 1; }
+    # keep alive while action runs
+    ( while true; do sleep 60; sudo -n true 2>/dev/null || exit; done ) &
+    export SUDO_KEEPA_PID=$!
+    trap '[[ -n "${SUDO_KEEPA_PID:-}" ]] && kill "$SUDO_KEEPA_PID" 2>/dev/null || true' RETURN
+  fi
 }
 
 run() { log "RUN: $*"; "$@"; }
@@ -96,15 +107,15 @@ install_with_mgr() {
   esac
 }
 
+# Note: keep launcher sudo-free. Only actions may request sudo.
+# This function is only called by actions, never at startup.
 base_deps_check_install() {
-  local deps=(wget curl git sudo) missing=() mgr
+  local deps=(wget curl git) missing=() mgr
   for d in "${deps[@]}"; do have "$d" || missing+=("$d"); done
-  if [[ ${#missing[@]} -eq 0 ]]; then ok "Base deps present: wget curl git sudo"; return 0; fi
+  if [[ ${#missing[@]} -eq 0 ]]; then ok "Base deps present: wget curl git"; return 0; fi
   mgr=$(detect_pkg) || { err "Unsupported package manager. Please install: ${missing[*]}"; return 1; }
-  if [[ $EUID -ne 0 && " ${missing[*]} " == *" sudo "* ]]; then
-    err "'sudo' is missing and you are not root. Re-run as root to install: ${missing[*]}"; return 1
-  fi
-  inf "Installing missing base deps via $mgr: ${missing[*]}"
+  inf "Installing missing deps via $mgr: ${missing[*]}"
+  sudo_warmup || true
   install_with_mgr "$mgr" "${missing[@]}" || { err "Failed to install: ${missing[*]}"; return 1; }
   ok "Base dependencies installed."
 }
@@ -116,6 +127,7 @@ ensure_python3() {
   have python3 && return 0
   warn "python3 not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
+  sudo_warmup || true
   case "$mgr" in
     apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y install python3 ;;
     dnf)    run sudo_maybe dnf -y install python3 ;;
@@ -130,6 +142,7 @@ ensure_pip3() {
   have pip3 && return 0
   warn "pip3 not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
+  sudo_warmup || true
   case "$mgr" in
     apt)    run sudo_maybe apt-get -y install python3-pip ;;
     dnf)    run sudo_maybe dnf -y install python3-pip ;;
@@ -144,6 +157,7 @@ ensure_ffmpeg() {
   have ffmpeg && return 0
   warn "ffmpeg not found. Installing…"
   local mgr; mgr=$(detect_pkg) || { err "Unknown package manager"; return 1; }
+  sudo_warmup || true
   case "$mgr" in
     apt)    run sudo_maybe apt-get -y install ffmpeg ;;
     dnf)    run sudo_maybe dnf -y install ffmpeg ;;
@@ -158,6 +172,7 @@ ensure_ytdlp() {
   have yt-dlp && return 0
   warn "yt-dlp not found. Attempting distro install…"
   local mgr ok=false; mgr=$(detect_pkg) || true
+  sudo_warmup || true
   case "$mgr" in
     apt)    run sudo_maybe apt-get -y install yt-dlp && ok=true ;;
     dnf)    run sudo_maybe dnf -y install yt-dlp && ok=true ;;
@@ -176,6 +191,16 @@ ensure_ytdlp() {
 
 ensure_yt_deps() { ensure_wget && ensure_python3 && ensure_ffmpeg && ensure_ytdlp; }
 
+# Remove a helper if it was downloaded into the CWD (./NAME), but don't touch system/local fallback paths.
+cleanup_downloaded_helper() {
+  local f="${1:-}"
+  [[ -n "$f" && -e "$f" ]] || return 0
+  case "$f" in
+    ./*) rm -f -- "$f" && ok "Removed helper: $f" ;;
+    *)   : ;; # keep anything not in CWD
+  esac
+}
+
 # ---------------- Actions ----------------
 x27_sysinfo() {
   inf "Host: $(hostname)"; inf "User: $USER"
@@ -191,6 +216,7 @@ x27_update() {
   local mgr; mgr=$(detect_pkg) || { err "No supported package manager."; return 1; }
   warn "This will update system packages using: $mgr"
   confirm "Proceed with system update?" || { warn "Canceled."; return 0; }
+  sudo_warmup || true
   case "$mgr" in
     apt)    run sudo_maybe apt-get update; run sudo_maybe apt-get -y upgrade; run sudo_maybe apt-get -y autoremove ;;
     dnf)    run sudo_maybe dnf -y upgrade ;;
@@ -206,6 +232,7 @@ x27_cleanup() {
   inf "Cleaning package caches and old logs where possible."
   confirm "Proceed with cleanup?" || { warn "Canceled."; return 0; }
   local mgr; mgr=$(detect_pkg) || true
+  sudo_warmup || true
   case "$mgr" in
     apt)     run sudo_maybe apt-get -y autoremove; run sudo_maybe apt-get -y autoclean ;;
     dnf|yum) run sudo_maybe "$mgr" clean all -y ;;
@@ -231,29 +258,30 @@ x27_debian_desktop_setup() {
     run chmod +x "$DEBIAN_POST_LOCAL_NAME"
     runner="./$DEBIAN_POST_LOCAL_NAME"
   fi
+  sudo_warmup || true
   inf "Executing: $runner"
   run sudo_maybe bash "$runner"
+  cleanup_downloaded_helper "$runner"
   ok "Debian Desktop Setup complete (system may reboot)."
 }
 
 x27_yt_downloader() {
   echo; inf "YT Downloader (local script)"
   msg " - yt-dlp + ffmpeg; downloads to ./YT-Downloads"
-  local fname="YT-Downloader-Cli.py"
-  if have yt-dlp; then
-    ok "yt-dlp detected"
-    have python3 || { err "python3 missing"; return 1; }
-    [[ -f "$fname" ]] || { ensure_wget || return 1; inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
-    inf "Launching: python3 $fname"
-    run python3 "$fname" || true
-    ok "Done. Files → ./YT-Downloads"
-    return 0
+  local fname="YT-Downloader-Cli.py" fetched="false"
+  if ! [[ -f "$fname" ]]; then
+    ensure_wget || return 1
+    inf "Fetching → ./$fname"
+    run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"
+    fetched="true"
   fi
-  warn "yt-dlp not found. Installing prerequisites…"
-  ensure_yt_deps || return 1
-  [[ -f "$fname" ]] || { inf "Fetching → ./$fname"; run bash -c "wget -qO '$fname' '$YTDL_PY_URL'"; }
+  if ! have yt-dlp || ! have ffmpeg || ! have python3; then
+    warn "Ensuring prerequisites…"
+    ensure_yt_deps || { [[ "$fetched" == "true" ]] && rm -f "$fname"; return 1; }
+  fi
   inf "Launching: python3 $fname"
   run python3 "$fname" || true
+  [[ "$fetched" == "true" ]] && rm -f -- "$fname" && ok "Removed helper: ./$fname"
   ok "Done. Files → ./YT-Downloads"
 }
 
@@ -271,8 +299,10 @@ x27_virtualization_setup() {
     run chmod +x "$VIRT_LOCAL_NAME"
     runner="./$VIRT_LOCAL_NAME"
   fi
+  sudo_warmup || true
   inf "Executing: $runner"
   run sudo_maybe bash "$runner"
+  cleanup_downloaded_helper "$runner"
   ok "Virtualization ready. Try: virt-manager"
 }
 
@@ -284,8 +314,10 @@ x27_server_updater() {
   inf "Downloading → ./$SERVER_UPDATER_LOCAL_NAME"
   run bash -c "wget -qO '$SERVER_UPDATER_LOCAL_NAME' '$SERVER_UPDATER_URL'"
   run chmod +x "$SERVER_UPDATER_LOCAL_NAME"
+  sudo_warmup || true
   inf "Executing: sudo bash $SERVER_UPDATER_LOCAL_NAME"
   run sudo_maybe bash "$SERVER_UPDATER_LOCAL_NAME"
+  cleanup_downloaded_helper "./$SERVER_UPDATER_LOCAL_NAME"
   ok "Server Updater deployed."
 }
 
@@ -297,8 +329,10 @@ x27_docker_install() {
   inf "Downloading → ./$DOCKER_INSTALL_LOCAL_NAME"
   run bash -c "wget -qO '$DOCKER_INSTALL_LOCAL_NAME' '$DOCKER_INSTALL_URL'"
   run chmod +x "$DOCKER_INSTALL_LOCAL_NAME"
+  sudo_warmup || true
   inf "Executing: sudo bash $DOCKER_INSTALL_LOCAL_NAME"
   run sudo_maybe bash "$DOCKER_INSTALL_LOCAL_NAME"
+  cleanup_downloaded_helper "./$DOCKER_INSTALL_LOCAL_NAME"
   ok "Docker install finished (log out/in may be required for group changes)."
 }
 
@@ -318,8 +352,10 @@ x27_fedora_postsetup() {
   run bash -c "wget -qO '$FEDORA_POST_LOCAL_NAME' '$FEDORA_POST_URL'"
   [[ -s "$FEDORA_POST_LOCAL_NAME" ]] || { err "Download failed or empty file: $FEDORA_POST_LOCAL_NAME"; return 1; }
   run chmod +x "$FEDORA_POST_LOCAL_NAME"
+  sudo_warmup || true
   inf "Executing: sudo bash $FEDORA_POST_LOCAL_NAME"
   run sudo_maybe bash "$FEDORA_POST_LOCAL_NAME"
+  cleanup_downloaded_helper "./$FEDORA_POST_LOCAL_NAME"
   ok "Fedora Post-Setup complete."
 }
 
@@ -332,25 +368,30 @@ x27_brave_debloat() {
   run bash -c "wget -qO '$BRAVE_DEBLOAT_LOCAL_NAME' '$BRAVE_DEBLOAT_URL'"
   [[ -s "$BRAVE_DEBLOAT_LOCAL_NAME" ]] || { err "Download failed or empty file: $BRAVE_DEBLOAT_LOCAL_NAME"; return 1; }
   run chmod +x "$BRAVE_DEBLOAT_LOCAL_NAME"
+  sudo_warmup || true
   inf "Executing: sudo bash $BRAVE_DEBLOAT_LOCAL_NAME"
   run sudo_maybe bash "$BRAVE_DEBLOAT_LOCAL_NAME"
+  cleanup_downloaded_helper "./$BRAVE_DEBLOAT_LOCAL_NAME"
   ok "Brave debloat complete."
 }
 
 # ---------------- Categorized registry ----------------
-# Category IDs
-declare -a CATEGORY_IDS=("desktop" "system" "servers")
+# Category IDs (added 'gaming' at the end, shown below others)
+declare -a CATEGORY_IDS=("desktop" "system" "servers" "gaming")
 # Category display titles
 declare -A CATEGORY_TITLES=(
   [desktop]="Linux Desktop"
   [system]="System"
   [servers]="Servers & Dev"
+  [gaming]="Gaming"
 )
 
 # Actions per category
 declare -a ACTIONS_desktop=( "debian_desktop_setup" "virtualization_setup" "fedora_postsetup" "brave_debloat" )
 declare -a ACTIONS_system=( "sysinfo" "update" "cleanup" "yt_downloader" )
 declare -a ACTIONS_servers=( "docker_install" "server_updater" )
+# Intentionally empty gaming list (you will add tools later)
+declare -a ACTIONS_gaming=()
 
 # Descriptions
 declare -A DESCRIPTIONS=(
@@ -393,16 +434,19 @@ print_actions_by_category() {
     local -n arr="ACTIONS_${id}"
 
     printf "%s┌─ %s%s%s ───────────────────────────┐%s\n" "$CYA" "$BOLD" "$title" "$RST" "$RST"
-    for act in "${arr[@]}"; do
-      desc="${DESCRIPTIONS[$act]}"
-      printf " %2d) %-22s %s\n" "$idx" "$act" "$desc"
-      MENU_ACTIONS+=("$act")
-      ((idx++))
-    done
+    if ((${#arr[@]})); then
+      for act in "${arr[@]}"; do
+        desc="${DESCRIPTIONS[$act]}"
+        printf " %2d) %-22s %s\n" "$idx" "$act" "$desc"
+        MENU_ACTIONS+=("$act")
+        ((idx++))
+      done
+    else
+      printf "    (no tools yet)\n"
+    fi
     printf "└──────────────────────────────────────────┘%s\n\n" "$RST"
   done
 
-  # Export the flattened action list for selection handler
   export MENU_ACTIONS_STR="${MENU_ACTIONS[*]}"
 }
 
@@ -424,7 +468,6 @@ menu() {
   printf "%s══════════════════════════════════════════════%s\n\n" "$CYA" "$RST"
 
   print_actions_by_category
-  # Reconstruct MENU_ACTIONS array from exported string
   IFS=' ' read -r -a MENU_ACTIONS <<<"$MENU_ACTIONS_STR"
 
   echo " q) quit"
@@ -451,8 +494,7 @@ menu() {
 }
 
 main() {
-  base_deps_check_install || exit 1
-
+  # Launcher is now sudo-free; dependency installs happen inside actions as needed.
   if [[ $# -eq 0 ]]; then
     menu
     exit 0
