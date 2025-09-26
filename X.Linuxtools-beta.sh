@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # X27 — sysinfo, update, cleanup, debian_desktop_setup, yt_downloader,
 #        virtualization_setup, server_updater, docker_install,
-#        fedora_postsetup, brave_debloat
+#        fedora_postsetup, brave_debloat, proton_cachyos_installer
 # Clean banner menu • logs deleted after each run • logs in ./logs
 
 # ---------------- Strict mode ----------------
@@ -11,7 +11,7 @@ IFS=$' \t\n'
 # ---------------- Metadata ----------------
 APP_NAME="X27"
 APP_CMD="${0##*/}"
-VERSION="0.9.0"
+VERSION="0.10.0"
 
 # ---------------- External script URLs ----------------
 DEBIAN_POST_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/Debian-Post-Installer.sh"
@@ -36,6 +36,10 @@ FEDORA_POST_LOCAL_NAME="Fedora-PostSetup.sh"
 BRAVE_DEBLOAT_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/make_brave_great_again.sh"
 BRAVE_DEBLOAT_LOCAL_NAME="make_brave_great_again.sh"
 
+# Gaming: Proton-CachyOS installer
+PROTON_CACHY_URL="https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/proton-cachyos-installer.sh"
+PROTON_CACHY_LOCAL_NAME="proton-cachyos-installer.sh"
+
 # ---------------- Colors ----------------
 if [[ -t 1 ]]; then
   BOLD=$'\e[1m'; DIM=$'\e[2m'; RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; CYA=$'\e[36m'; RST=$'\e[0m'
@@ -57,7 +61,7 @@ ok()   { printf "%s✔%s %s\n" "$GRN" "$RST" "$*"; }
 warn() { printf "%s!%s %s\n"  "$YLW" "$RST" "$*"; }
 err()  { printf "%s✖%s %s\n" "$RED" "$RST" "$*" >&2; }
 
-safe_clear() { if command -v clear >/div/null 2>&1 && [[ -t 1 ]]; then clear; else printf "\n%.0s" {1..5}; fi; }
+safe_clear() { if command -v clear >/dev/null 2>&1 && [[ -t 1 ]]; then clear; else printf "\n%.0s" {1..5}; fi; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 sudo_maybe() {
@@ -66,11 +70,10 @@ sudo_maybe() {
   else "$@"; fi
 }
 
-# Prompt for sudo once per action, if desired by the action
+# Prompt for sudo once per action (when needed)
 sudo_warmup() {
   if [[ $EUID -ne 0 ]] && have sudo; then
     sudo -v || { err "sudo authentication failed."; return 1; }
-    # keep alive while action runs
     ( while true; do sleep 60; sudo -n true 2>/dev/null || exit; done ) &
     export SUDO_KEEPA_PID=$!
     trap '[[ -n "${SUDO_KEEPA_PID:-}" ]] && kill "$SUDO_KEEPA_PID" 2>/dev/null || true' RETURN
@@ -85,7 +88,7 @@ confirm() {
   [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]]
 }
 
-# ---------------- Base deps ----------------
+# ---------------- Base deps (invoked by actions only) ----------------
 detect_pkg() {
   if   have apt-get; then echo apt
   elif have dnf;     then echo dnf
@@ -107,8 +110,6 @@ install_with_mgr() {
   esac
 }
 
-# Note: keep launcher sudo-free. Only actions may request sudo.
-# This function is only called by actions, never at startup.
 base_deps_check_install() {
   local deps=(wget curl git) missing=() mgr
   for d in "${deps[@]}"; do have "$d" || missing+=("$d"); done
@@ -191,13 +192,13 @@ ensure_ytdlp() {
 
 ensure_yt_deps() { ensure_wget && ensure_python3 && ensure_ffmpeg && ensure_ytdlp; }
 
-# Remove a helper if it was downloaded into the CWD (./NAME), but don't touch system/local fallback paths.
+# Remove helper if downloaded in CWD
 cleanup_downloaded_helper() {
   local f="${1:-}"
   [[ -n "$f" && -e "$f" ]] || return 0
   case "$f" in
     ./*) rm -f -- "$f" && ok "Removed helper: $f" ;;
-    *)   : ;; # keep anything not in CWD
+    *)   : ;;
   esac
 }
 
@@ -375,10 +376,26 @@ x27_brave_debloat() {
   ok "Brave debloat complete."
 }
 
+# -------- Gaming: Proton-CachyOS installer --------
+x27_proton_cachyos_installer() {
+  echo; inf "Proton-CachyOS Installer"
+  msg " - Downloads and runs the Proton-CachyOS installer."
+  confirm "Proceed with Proton-CachyOS installer?" || { warn "Canceled."; return 0; }
+  ensure_wget || return 1
+  local runner="./$PROTON_CACHY_LOCAL_NAME"
+  inf "Downloading → $runner"
+  run bash -c "wget -qO '$runner' '$PROTON_CACHY_URL'"
+  [[ -s "$runner" ]] || { err "Download failed or empty file: $runner"; return 1; }
+  run chmod +x "$runner"
+  sudo_warmup || true
+  inf "Executing with sudo: $runner"
+  run sudo_maybe bash "$runner"
+  cleanup_downloaded_helper "$runner"
+  ok "Proton-CachyOS installer finished."
+}
+
 # ---------------- Categorized registry ----------------
-# Category IDs (added 'gaming' at the end, shown below others)
 declare -a CATEGORY_IDS=("desktop" "system" "servers" "gaming")
-# Category display titles
 declare -A CATEGORY_TITLES=(
   [desktop]="Linux Desktop"
   [system]="System"
@@ -386,14 +403,11 @@ declare -A CATEGORY_TITLES=(
   [gaming]="Gaming"
 )
 
-# Actions per category
 declare -a ACTIONS_desktop=( "debian_desktop_setup" "virtualization_setup" "fedora_postsetup" "brave_debloat" )
 declare -a ACTIONS_system=( "sysinfo" "update" "cleanup" "yt_downloader" )
 declare -a ACTIONS_servers=( "docker_install" "server_updater" )
-# Intentionally empty gaming list (you will add tools later)
-declare -a ACTIONS_gaming=()
+declare -a ACTIONS_gaming=( "proton_cachyos_installer" )
 
-# Descriptions
 declare -A DESCRIPTIONS=(
   [sysinfo]="Show basic system info (CPU/mem/disk)."
   [update]="Update system packages (with confirmation)."
@@ -405,29 +419,30 @@ declare -A DESCRIPTIONS=(
   [docker_install]="Docker: Engine + plugins, docker group, optional Portainer."
   [fedora_postsetup]="Fedora Post-Setup: download and run Fedora-PostSetup.sh."
   [brave_debloat]="Brave Debloat: privacy/bloat tweaks."
+  [proton_cachyos_installer]="Installer for Proton-CachyOS."
 )
 
-# Case dispatcher
 run_action() {
   local name="${1:-}"; shift || true
   case "$name" in
-    sysinfo)              x27_sysinfo "$@";;
-    update)               x27_update "$@";;
-    cleanup)              x27_cleanup "$@";;
-    debian_desktop_setup) x27_debian_desktop_setup "$@";;
-    yt_downloader)        x27_yt_downloader "$@";;
-    virtualization_setup) x27_virtualization_setup "$@";;
-    server_updater)       x27_server_updater "$@";;
-    docker_install)       x27_docker_install "$@";;
-    fedora_postsetup)     x27_fedora_postsetup "$@";;
-    brave_debloat)        x27_brave_debloat "$@";;
+    sysinfo)                      x27_sysinfo "$@";;
+    update)                       x27_update "$@";;
+    cleanup)                      x27_cleanup "$@";;
+    debian_desktop_setup)         x27_debian_desktop_setup "$@";;
+    yt_downloader)                x27_yt_downloader "$@";;
+    virtualization_setup)         x27_virtualization_setup "$@";;
+    server_updater)               x27_server_updater "$@";;
+    docker_install)               x27_docker_install "$@";;
+    fedora_postsetup)             x27_fedora_postsetup "$@";;
+    brave_debloat)                x27_brave_debloat "$@";;
+    proton_cachyos_installer)     x27_proton_cachyos_installer "$@";;
     *) err "Unknown action: $name"; exit 1;;
   esac
 }
 
 print_actions_by_category() {
   local -a MENU_ACTIONS=()
-  local idx=1 cat id act desc
+  local idx=1 id act desc
 
   for id in "${CATEGORY_IDS[@]}"; do
     local title="${CATEGORY_TITLES[$id]}"
@@ -437,7 +452,7 @@ print_actions_by_category() {
     if ((${#arr[@]})); then
       for act in "${arr[@]}"; do
         desc="${DESCRIPTIONS[$act]}"
-        printf " %2d) %-22s %s\n" "$idx" "$act" "$desc"
+        printf " %2d) %-24s %s\n" "$idx" "$act" "$desc"
         MENU_ACTIONS+=("$act")
         ((idx++))
       done
@@ -494,7 +509,7 @@ menu() {
 }
 
 main() {
-  # Launcher is now sudo-free; dependency installs happen inside actions as needed.
+  # Launcher is sudo-free; actions handle sudo on demand.
   if [[ $# -eq 0 ]]; then
     menu
     exit 0
