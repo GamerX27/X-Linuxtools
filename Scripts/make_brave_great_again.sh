@@ -55,7 +55,7 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultGeolocationSetting": 2,
   "DefaultNotificationsSetting": 2,
   "VideoCaptureAllowed": false,
-  "AudioCaptureAllowed": false
+  "AudioCaptureAllowed": false,
 
   "DefaultJavaScriptOptimizerSetting": 2
 }
