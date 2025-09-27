@@ -56,6 +56,8 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultNotificationsSetting": 2,
   "VideoCaptureAllowed": false,
   "AudioCaptureAllowed": false
+
+  "DefaultJavaScriptOptimizerSetting": 2
 }
 JSON
 
