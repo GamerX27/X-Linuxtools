@@ -1,7 +1,7 @@
 #!/bin/bash
 # make_brave_great_again.sh
 # Disable unwanted Brave features via managed policy
-# the name has nothing to do with politics even if it sounds like it...
+# The name has nothing to do with politics even if it sounds like it...
 # It may say in the privacy settings the mic and camera are still on, but they are blocked from being accessed.
 set -e
 
@@ -35,7 +35,7 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "UrlKeyedAnonymizedDataCollectionEnabled": false,
   "DefaultBrowserSettingEnabled": false,
   "PromotionsEnabled": false,
-
+  
   "PasswordManagerEnabled": false,
   "AutofillAddressEnabled": false,
   "AutofillCreditCardEnabled": false,
@@ -71,26 +71,38 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
 }
 JSON
 
-echo "✅ Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
+echo "Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
 
 # If Brave is the Flatpak, grant it read-only access to the policies dir
 if has_brave_flatpak; then
   scope="$(brave_flatpak_scope)"
   if [ "$scope" = "system" ]; then
-    echo "🔧 Detected Brave (Flatpak, system install) — applying filesystem override…"
+    echo "Detected Brave (Flatpak, system install) — applying filesystem override..."
     sudo flatpak override --system com.brave.Browser --filesystem=/etc/brave/policies/managed:ro
   else
-    echo "🔧 Detected Brave (Flatpak, user install) — applying filesystem override…"
+    echo "Detected Brave (Flatpak, user install) — applying filesystem override..."
     flatpak override --user com.brave.Browser --filesystem=/etc/brave/policies/managed:ro
   fi
-  echo "✅ Flatpak override applied."
+  echo "Flatpak override applied."
 else
-  echo "ℹ️ Brave Flatpak not detected — no Flatpak override needed."
+  echo "Brave Flatpak not detected — no Flatpak override needed."
 fi
 
-echo "🎉 All done."
+# ---- Block Brave telemetry domains in /etc/hosts (last step) ----
+HOSTS_LINE="0.0.0.0 variations.brave.com"
+HOSTS_LINE_IPV6=":: variations.brave.com"
 
+if ! grep -q "variations.brave.com" /etc/hosts; then
+  echo "Adding variations.brave.com to /etc/hosts..."
+  echo -e "$HOSTS_LINE\n$HOSTS_LINE_IPV6" | sudo tee -a /etc/hosts >/dev/null
+  echo "Host entries added."
+else
+  echo "variations.brave.com already exists in /etc/hosts. Skipping."
+fi
+# -----------------------------------------------------
 
-#Credits
-#Chromium Policy:https://chromeenterprise.google/policies/
-#Brave Policy: https://support.brave.app/hc/en-us/articles/360039248271-Group-Policy
+echo "All done."
+
+# Credits
+# Chromium Policy: https://chromeenterprise.google/policies/
+# Brave Policy: https://support.brave.app/hc/en-us/articles/360039248271-Group-Policy
