@@ -62,8 +62,13 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "DefaultSensorsSetting": 2,
   "SafeBrowsingProxiedRealTimeChecksAllowed": false,
   "SafeBrowsingProtectionLevel": 0,
-  "DefaultPopupsSetting": 2
-  }
+  "DefaultPopupsSetting": 2,
+  "ChromeVariations": 2,
+  "URLBlocklist": [
+   "https://variations.brave.com/*",
+   "https://safebrowsing.brave.com/*"
+  ]
+}
 JSON
 
 echo "✅ Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
@@ -84,3 +89,8 @@ else
 fi
 
 echo "🎉 All done."
+
+
+#Credits
+#Chromium Policy:https://chromeenterprise.google/policies/
+#Brave Policy: https://support.brave.app/hc/en-us/articles/360039248271-Group-Policy
