@@ -59,7 +59,10 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
 
   "DefaultJavaScriptOptimizerSetting": 2,
   "ChromeVariations": 2,
-  "DefaultSensorsSetting": 2
+  "DefaultSensorsSetting": 2,
+  "SafeBrowsingProxiedRealTimeChecksAllowed": false,
+  "SafeBrowsingProtectionLevel": 0,
+  "DefaultPopupsSetting": 2
   }
 JSON
 
