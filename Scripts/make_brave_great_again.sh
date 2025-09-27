@@ -88,9 +88,13 @@ else
   echo "Brave Flatpak not detected — no Flatpak override needed."
 fi
 
-# ---- Block Brave telemetry domains in /etc/hosts (last step) ----
+# ---- Add Brave telemetry domains to /etc/hosts ----
+echo "Adding Brave telemetry domains to /etc/hosts:"
+echo " - variations.brave.com"
+echo " - safebrowsing.brave.com"
+
 if ! grep -q "variations.brave.com" /etc/hosts; then
-  echo "Adding variations.brave.com to /etc/hosts..."
+  echo "Adding variations.brave.com..."
   echo -e "0.0.0.0 variations.brave.com\n:: variations.brave.com" | sudo tee -a /etc/hosts >/dev/null
   echo "variations.brave.com entries added."
 else
@@ -98,13 +102,13 @@ else
 fi
 
 if ! grep -q "safebrowsing.brave.com" /etc/hosts; then
-  echo "Adding safebrowsing.brave.com to /etc/hosts..."
+  echo "Adding safebrowsing.brave.com..."
   echo -e "0.0.0.0 safebrowsing.brave.com\n:: safebrowsing.brave.com" | sudo tee -a /etc/hosts >/dev/null
   echo "safebrowsing.brave.com entries added."
 else
   echo "safebrowsing.brave.com already exists in /etc/hosts. Skipping."
 fi
-# -----------------------------------------------------
+# ---------------------------------------------------
 
 echo "All done."
 
