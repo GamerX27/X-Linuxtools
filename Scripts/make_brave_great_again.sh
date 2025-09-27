@@ -58,7 +58,8 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
   "AudioCaptureAllowed": false,
 
   "DefaultJavaScriptOptimizerSetting": 2,
-  "ChromeVariations": 2
+  "ChromeVariations": 2,
+  "DefaultSensorsSetting": 2
   }
 JSON
 
