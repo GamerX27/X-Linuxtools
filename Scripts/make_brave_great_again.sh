@@ -89,20 +89,20 @@ else
 fi
 
 # ---- Block Brave telemetry domains in /etc/hosts (last step) ----
-HOSTS_ENTRIES=$(cat <<EOF
-0.0.0.0 variations.brave.com
-:: variations.brave.com
-0.0.0.0 safebrowsing.brave.com
-:: safebrowsing.brave.com
-EOF
-)
-
-if ! grep -q "variations.brave.com" /etc/hosts || ! grep -q "safebrowsing.brave.com" /etc/hosts; then
-  echo "Adding Brave telemetry domains to /etc/hosts..."
-  echo -e "$HOSTS_ENTRIES" | sudo tee -a /etc/hosts >/dev/null
-  echo "Host entries added."
+if ! grep -q "variations.brave.com" /etc/hosts; then
+  echo "Adding variations.brave.com to /etc/hosts..."
+  echo -e "0.0.0.0 variations.brave.com\n:: variations.brave.com" | sudo tee -a /etc/hosts >/dev/null
+  echo "variations.brave.com entries added."
 else
-  echo "Brave telemetry domains already exist in /etc/hosts. Skipping."
+  echo "variations.brave.com already exists in /etc/hosts. Skipping."
+fi
+
+if ! grep -q "safebrowsing.brave.com" /etc/hosts; then
+  echo "Adding safebrowsing.brave.com to /etc/hosts..."
+  echo -e "0.0.0.0 safebrowsing.brave.com\n:: safebrowsing.brave.com" | sudo tee -a /etc/hosts >/dev/null
+  echo "safebrowsing.brave.com entries added."
+else
+  echo "safebrowsing.brave.com already exists in /etc/hosts. Skipping."
 fi
 # -----------------------------------------------------
 
