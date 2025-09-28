@@ -81,5 +81,22 @@ sudo systemctl restart NetworkManager
 
 echo "[DONE] Connectivity check disabled (renamed with .xyz)."
 
+echo "Starting Brave enhancement process..."
 
-echo "=== Setup complete ✅ ==="
+echo "Downloading make_brave_great_again.sh..."
+wget https://raw.githubusercontent.com/GamerX27/X-Linuxtools/refs/heads/main/Scripts/make_brave_great_again.sh -O make_brave_great_again.sh
+
+echo "Setting execute permissions..."
+chmod +x make_brave_great_again.sh
+
+echo "Running the script..."
+./make_brave_great_again.sh
+
+echo "Cleaning up..."
+rm make_brave_great_again.sh
+
+echo "Brave enhancement process completed."
+
+wait 5
+
+echo Done!"
